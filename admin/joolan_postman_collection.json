@@ -1,0 +1,706 @@
+{
+  "info": {
+    "name": "Joolan API - Admin",
+    "description": "Collection Postman générée pour les APIs de Joolan (Catalogue, Stock, Clients, Tickets, Imports, Logistique, Négoce, etc.)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://votre-domaine-api.com",
+      "type": "string"
+    },
+    {
+      "key": "enseigne",
+      "value": "VOTRE_ENSEIGNE",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "VOTRE_CLE_API",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Catalogue",
+      "item": [
+        {
+          "name": "Catalogue produits e-commerce",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/catalogue-web.do?enseigne={{enseigne}}&api-key={{api_key}}&output-format=json&last-call=2026-01-01 00:00:00&Magasin=PARIS&Produit=TSHIRT-001",
+              "host": ["{{base_url}}"],
+              "path": ["catalogue-web.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "output-format", "value": "json" },
+                { "key": "last-call", "value": "2026-01-01 00:00:00" },
+                { "key": "Magasin", "value": "PARIS" },
+                { "key": "Produit", "value": "TSHIRT-001" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stock",
+      "item": [
+        {
+          "name": "Consulter le stock d'un produit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/stock.do?enseigne={{enseigne}}&api-key={{api_key}}&Produit=TSHIRT-001&Couleur=BLANC&Taille=M&Magasins=PARIS;LYON",
+              "host": ["{{base_url}}"],
+              "path": ["stock.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Produit", "value": "TSHIRT-001" },
+                { "key": "Couleur", "value": "BLANC" },
+                { "key": "Taille", "value": "M" },
+                { "key": "Magasins", "value": "PARIS;LYON" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Vérifier si un EAN existe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ean-existe.do?enseigne={{enseigne}}&ean=3760123456789",
+              "host": ["{{base_url}}"],
+              "path": ["ean-existe.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "ean", "value": "3760123456789" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Image complète des stocks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/image-full-stocks.do?enseigne={{enseigne}}&api-key={{api_key}}&Magasins=PARIS;LYON",
+              "host": ["{{base_url}}"],
+              "path": ["image-full-stocks.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Magasins", "value": "PARIS;LYON" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Image des stocks non nuls",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/image-stocks.do?enseigne={{enseigne}}&api-key={{api_key}}&Magasins=PARIS;LYON",
+              "host": ["{{base_url}}"],
+              "path": ["image-stocks.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Magasins", "value": "PARIS;LYON" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "Rechercher des clients",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Search\": [\n    {\n      \"Field\": \"Email\",\n      \"Value\": \"client@example.com\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/recherche-clients.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["recherche-clients.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des clients",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Nom\": \"DUPONT\",\n    \"Prenom\": \"Jean\",\n    \"email\": \"jean.dupont@example.com\",\n    \"Mobile\": \"+33612345678\",\n    \"Ville\": \"PARIS\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-clients.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-clients.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets",
+      "item": [
+        {
+          "name": "Exporter les tickets d'une journée",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/export-tickets.do?enseigne={{enseigne}}&api-key={{api_key}}&Date=2026-01-15",
+              "host": ["{{base_url}}"],
+              "path": ["export-tickets.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Date", "value": "2026-01-15" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Annuler un ticket",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/annulation-ticket.do?enseigne={{enseigne}}&api-key={{api_key}}&Entete=12345&Motif=Erreur de saisie",
+              "host": ["{{base_url}}"],
+              "path": ["annulation-ticket.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Entete", "value": "12345" },
+                { "key": "Motif", "value": "Erreur de saisie" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Générer le PDF d'un ticket",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ticket-pdf.do?enseigne={{enseigne}}&api-key={{api_key}}&Entete=12345&format=receipt",
+              "host": ["{{base_url}}"],
+              "path": ["ticket-pdf.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Entete", "value": "12345" },
+                { "key": "format", "value": "receipt" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des tickets de caisse",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Magasin\": \"OPERA\",\n    \"Caisse\": 1,\n    \"Nature\": \"VENTE\",\n    \"Vendeur\": \"SERGE\",\n    \"Lignes\": [\n      {\n        \"Produit\": \"ANGELA\",\n        \"Couleur\": \"BLEU\",\n        \"Taille\": \"S\",\n        \"Designation\": \"Chemise Angela Coton\",\n        \"Quantite\": 1,\n        \"Prix_Vente\": 175,\n        \"Taux_TVA\": 0\n      }\n    ],\n    \"Reglements\": [\n      {\n        \"Montant\": 175,\n        \"ModeReg\": \"300\",\n        \"Libelle\": \"CARTE BANCAIRE\",\n        \"Reference\": \"transaction CB 1234\"\n      }\n    ]\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-tickets.do?enseigne={{enseigne}}&api-key={{api_key}}&Magasins_Stocks='PARIS','OPERA'",
+              "host": ["{{base_url}}"],
+              "path": ["import-tickets.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Magasins_Stocks", "value": "'PARIS','OPERA'" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Import Produits",
+      "item": [
+        {
+          "name": "Importer des produits",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Produit\": \"TSHIRT-001\",\n    \"Designation\": \"T-shirt coton\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"EAN\": \"3760123456789\",\n    \"Rayon\": \"TEXTILE\",\n    \"Famille\": \"HAUTS\",\n    \"Marque\": \"MARQUE1\",\n    \"Prix_Achat\": 15,\n    \"Prix_Vente\": 49.9\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-produits.do?enseigne={{enseigne}}&api-key={{api_key}}&reset_tarif=1",
+              "host": ["{{base_url}}"],
+              "path": ["import-produits.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "reset_tarif", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des tarifs",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Tarif\": \"STANDARD\",\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"Prix_Vente\": 49.9,\n    \"Remise_Vente\": 0\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-tarifs.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-tarifs.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des produits associés",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Produit_Associe\": \"JEAN-001\",\n    \"Couleur_Associee\": \"BLEU\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-produits-associes.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-produits-associes.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Import Mouvements",
+      "item": [
+        {
+          "name": "Importer des réceptions fournisseurs",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Fournisseur\": \"FOURNISSEUR1\",\n    \"Date\": \"2026-02-15\",\n    \"Reference\": \"BL-001\",\n    \"Nature\": \"Réception\",\n    \"Magasin\": \"DEPOT\",\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"Quantite\": 100,\n    \"Prix_Achat\": 15\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-receptions.do?enseigne={{enseigne}}&api-key={{api_key}}&creation_produits=1",
+              "host": ["{{base_url}}"],
+              "path": ["import-receptions.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "creation_produits", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des transferts inter-magasins",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"demande\": \"transfert\",\n    \"reception_immediate\": 1,\n    \"ID\": \"TRF-001\",\n    \"Date\": \"2026-02-18\",\n    \"Magasin_Expediteur\": \"DEPOT\",\n    \"Magasin_Destinataire\": \"PARIS01\",\n    \"Lignes\": [\n      {\n        \"Produit\": \"TSHIRT-001\",\n        \"Couleur\": \"BLANC\",\n        \"Taille\": \"M\",\n        \"Quantite\": 10\n      },\n      {\n        \"Produit\": \"TSHIRT-001\",\n        \"Couleur\": \"NOIR\",\n        \"Taille\": \"L\",\n        \"Quantite\": 5\n      }\n    ]\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-transferts.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-transferts.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer un BL fournisseur",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/plain" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "Date\\tNumero_Bon_Livraison\\tColis\\tReference_Colis\\tMagasin\\tProduit\\tCouleur\\tTaille\\tQuantite\n15/02/2026\\tBL-001\\t1\\tCOL-001\\tDEPOT\\tTSHIRT-001\\tBLANC\\tM\\t50\n15/02/2026\\tBL-001\\t1\\tCOL-001\\tDEPOT\\tTSHIRT-001\\tBLANC\\tL\\t30\n15/02/2026\\tBL-001\\t2\\tCOL-002\\tDEPOT\\tTSHIRT-001\\tNOIR\\tM\\t40"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-bl-fournisseur.do?enseigne={{enseigne}}&api-key={{api_key}}&Fournisseur=FOURNISSEUR1&Commande=12345",
+              "host": ["{{base_url}}"],
+              "path": ["import-bl-fournisseur.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Fournisseur", "value": "FOURNISSEUR1" },
+                { "key": "Commande", "value": "12345" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des commandes fournisseurs",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/plain" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "Fournisseur\\tDate\\tNumero_Commande\\tMagasin\\tProduit\\tCouleur\\tTaille\\tQuantite\\tPrix_Achat\\tRemise_Achat\\tDevise\\tStatut\\tDate_Livraison\nFOURNISSEUR1\\t15/02/2026\\tCMD-001\\tPARIS\\tTSHIRT-001\\tBLANC\\tM\\t100\\t15.00\\t0\\tEUR\\tEn saisie\\t01/03/2026\nFOURNISSEUR1\\t15/02/2026\\tCMD-001\\tPARIS\\tTSHIRT-001\\tNOIR\\tM\\t50\\t15.00\\t5\\tEUR\\tEn saisie\\t01/03/2026"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-commandes-fournisseurs.do?enseigne={{enseigne}}&api-key={{api_key}}&creation-produits=1",
+              "host": ["{{base_url}}"],
+              "path": ["import-commandes-fournisseurs.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "creation-produits", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer une image de stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/plain" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "Magasin\\tProduit\\tCouleur\\tTaille\\tStock\nPARIS\\tTSHIRT-001\\tBLANC\\tM\\t25\nPARIS\\tTSHIRT-001\\tBLANC\\tL\\t18\nPARIS\\tTSHIRT-001\\tNOIR\\tM\\t12"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-image-stock.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-image-stock.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Import Divers",
+      "item": [
+        {
+          "name": "Importer des compteurs de passages",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Magasin\": \"PARIS\",\n    \"Date\": \"2026-01-26\",\n    \"Heure\": \"10:00:00\",\n    \"Compteur\": 1,\n    \"Entrees\": 150,\n    \"Sorties\": 120\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-compteurs-passages.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-compteurs-passages.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des fournisseurs",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Fournisseur\": \"FOURNISSEUR1\",\n    \"Contact\": \"Jean Dupont\",\n    \"Email\": \"contact@fournisseur1.com\",\n    \"Telephone\": \"+33123456789\",\n    \"Ville\": \"LYON\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-fournisseurs.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-fournisseurs.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des min/max de stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Profil_Stock\": \"STANDARD\",\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"Mini\": 5,\n    \"Maxi\": 20\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-min-max.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-min-max.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Importer des champs personnalisés",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Nature\": \"produits\",\n    \"Nom\": \"Poids_Net\",\n    \"Clef\": \"TSHIRT-001\",\n    \"Valeur\": \"200g\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/import-champs-perso.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["import-champs-perso.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Envoyer un message inter-magasins",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/envoyer-message.do?enseigne={{enseigne}}&api-key={{api_key}}&magasin-expediteur=OPERA&magasin-destinataire=PARIS&utilisateur-expediteur=ESHOP&message=Veuillez expédier le transfert 123 à PARIS svp",
+              "host": ["{{base_url}}"],
+              "path": ["envoyer-message.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "magasin-expediteur", "value": "OPERA" },
+                { "key": "magasin-destinataire", "value": "PARIS" },
+                { "key": "utilisateur-expediteur", "value": "ESHOP" },
+                { "key": "message", "value": "Veuillez expédier le transfert 123 à PARIS svp" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Exécuter une requête SQL",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/plain" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "SELECT Produit, Designation FROM produits LIMIT 5"
+            },
+            "url": {
+              "raw": "{{base_url}}/query.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["query.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Logistique",
+      "item": [
+        {
+          "name": "API Logistique (GET Catalogue)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/logistique.do?enseigne={{enseigne}}&api-key={{api_key}}&action=catalogue&tarif=STANDARD&last_change=2026-01-01T00:00:00",
+              "host": ["{{base_url}}"],
+              "path": ["logistique.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "action", "value": "catalogue" },
+                { "key": "tarif", "value": "STANDARD" },
+                { "key": "last_change", "value": "2026-01-01T00:00:00" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "API Logistique (POST Confirmation Transfert)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Entete\": 12345,\n  \"Magasin\": \"MAGASIN1\",\n  \"Caisse\": 1,\n  \"date_reception\": \"2026-01-27\",\n  \"heure_reception\": \"14:30:00\",\n  \"accepter_difference\": 1,\n  \"Produits\": [\n    {\n      \"Produit\": \"CHEMISE01\",\n      \"Couleur\": \"BLEU\",\n      \"Taille\": \"M\",\n      \"Quantite\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/logistique.do?enseigne={{enseigne}}&api-key={{api_key}}&action=confirmation_reception_transfert",
+              "host": ["{{base_url}}"],
+              "path": ["logistique.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "action", "value": "confirmation_reception_transfert" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Négoce B2B",
+      "item": [
+        {
+          "name": "API Négoce B2B (Créer Facture)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Client\": 138,\n  \"Nature\": \"FACTURE\",\n  \"Magasin\": \"DEPOT\",\n  \"Date\": \"2026-01-27\",\n  \"Produits\": [\n    {\n      \"Produit\": \"CHEMISE01\",\n      \"Couleur\": \"BLEU\",\n      \"Taille\": \"M\",\n      \"Quantite\": 10,\n      \"Prix_Vente\": 45,\n      \"Remise_Vente\": 10,\n      \"Commentaire\": \"Livraison urgente\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/negoce.do?enseigne={{enseigne}}&api-key={{api_key}}&action=creer_piece",
+              "host": ["{{base_url}}"],
+              "path": ["negoce.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "action", "value": "creer_piece" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tax-Free",
+      "item": [
+        {
+          "name": "Export XML Tax-Free (Planet PII)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/planet-pii.do?enseigne={{enseigne}}&api-key={{api_key}}&Entete=12345",
+              "host": ["{{base_url}}"],
+              "path": ["planet-pii.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" },
+                { "key": "Entete", "value": "12345" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rapports",
+      "item": [
+        {
+          "name": "Générer une URL de rapport",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_rapport\": \"12345\",\n  \"parametres\": [\n    {\n      \"name\": \"Date_Debut\",\n      \"value\": \"2026-01-01\"\n    },\n    {\n      \"name\": \"Date_Fin\",\n      \"value\": \"2026-01-31\"\n    }\n  ],\n  \"format\": \"pdf\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/generation-rapports.do?enseigne={{enseigne}}&api-key={{api_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["generation-rapports.do"],
+              "query": [
+                { "key": "enseigne", "value": "{{enseigne}}" },
+                { "key": "api-key", "value": "{{api_key}}" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

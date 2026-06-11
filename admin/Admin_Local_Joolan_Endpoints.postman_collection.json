@@ -1,0 +1,1038 @@
+{
+  "info": {
+    "name": "Admin Local Joolan Endpoints (Documentation Intégrée)",
+    "description": "Collection complète avec les vrais exemples de payloads JSON, TSV et Query params de la documentation Joolan.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Clients",
+      "item": [
+        {
+          "name": "Recherche Clients (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Search\": [\n    {\n      \"Field\": \"Email\",\n      \"Value\": \"client@example.com\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/client?action=search",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "client"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "search"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Clients (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Nom\": \"DUPONT\",\n    \"Prenom\": \"Jean\",\n    \"email\": \"jean.dupont@example.com\",\n    \"Mobile\": \"+33612345678\",\n    \"Ville\": \"PARIS\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/client?action=import",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "client"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "import"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Tickets",
+      "item": [
+        {
+          "name": "Export Tickets (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/tickets?action=export&Date=2026-01-15",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "export"
+                },
+                {
+                  "key": "Date",
+                  "value": "2026-01-15"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ticket PDF (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/tickets?action=pdf&Entete=12345&format=receipt",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "pdf"
+                },
+                {
+                  "key": "Entete",
+                  "value": "12345"
+                },
+                {
+                  "key": "format",
+                  "value": "receipt"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Annulation Ticket (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/tickets?action=annulation&Entete=12345&Motif=Erreur de saisie",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "annulation"
+                },
+                {
+                  "key": "Entete",
+                  "value": "12345"
+                },
+                {
+                  "key": "Motif",
+                  "value": "Erreur de saisie"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Tickets (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Magasin\": \"OPERA\",\n    \"Caisse\": 1,\n    \"Nature\": \"VENTE\",\n    \"Vendeur\": \"SERGE\",\n    \"Lignes\": [\n      {\n        \"Produit\": \"ANGELA\",\n        \"Couleur\": \"BLEU\",\n        \"Taille\": \"S\",\n        \"Designation\": \"Chemise Angela Coton\",\n        \"Quantite\": 1,\n        \"Prix_Vente\": 175,\n        \"Taux_TVA\": 0\n      }\n    ],\n    \"Reglements\": [\n      {\n        \"Montant\": 175,\n        \"ModeReg\": \"300\",\n        \"Libelle\": \"CARTE BANCAIRE\",\n        \"Reference\": \"transaction CB 1234\"\n      }\n    ]\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/tickets?action=import&Magasins_Stocks='PARIS','OPERA'",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "import"
+                },
+                {
+                  "key": "Magasins_Stocks",
+                  "value": "'PARIS','OPERA'"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Imports (Produits & Tarifs)",
+      "item": [
+        {
+          "name": "Import Produits (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Produit\": \"TSHIRT-001\",\n    \"Designation\": \"T-shirt coton\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"EAN\": \"3760123456789\",\n    \"Rayon\": \"TEXTILE\",\n    \"Famille\": \"HAUTS\",\n    \"Marque\": \"MARQUE1\",\n    \"Prix_Achat\": 15,\n    \"Prix_Vente\": 49.9\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=produits&reset_tarif=1",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "produits"
+                },
+                {
+                  "key": "reset_tarif",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Tarifs (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Tarif\": \"STANDARD\",\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"Prix_Vente\": 49.9,\n    \"Remise_Vente\": 0\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=tarifs",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "tarifs"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Produits Associés (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Produit_Associe\": \"JEAN-001\",\n    \"Couleur_Associee\": \"BLEU\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=produits-associes",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "produits-associes"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Mouvements (Imports)",
+      "item": [
+        {
+          "name": "Import Réceptions (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Fournisseur\": \"FOURNISSEUR1\",\n    \"Date\": \"2026-02-15\",\n    \"Reference\": \"BL-001\",\n    \"Nature\": \"Réception\",\n    \"Magasin\": \"DEPOT\",\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"Quantite\": 100,\n    \"Prix_Achat\": 15\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=receptions&creation_produits=1",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "receptions"
+                },
+                {
+                  "key": "creation_produits",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Transferts (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"demande\": \"transfert\",\n    \"reception_immediate\": 1,\n    \"ID\": \"TRF-001\",\n    \"Date\": \"2026-02-18\",\n    \"Magasin_Expediteur\": \"DEPOT\",\n    \"Magasin_Destinataire\": \"PARIS01\",\n    \"Lignes\": [\n      {\n        \"Produit\": \"TSHIRT-001\",\n        \"Couleur\": \"BLANC\",\n        \"Taille\": \"M\",\n        \"Quantite\": 10\n      },\n      {\n        \"Produit\": \"TSHIRT-001\",\n        \"Couleur\": \"NOIR\",\n        \"Taille\": \"L\",\n        \"Quantite\": 5\n      }\n    ]\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=transferts",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "transferts"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import BL Fournisseur (POST - Text)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "Date\tNumero_Bon_Livraison\tColis\tReference_Colis\tMagasin\tProduit\tCouleur\tTaille\tQuantite\n15/02/2026\tBL-001\t1\tCOL-001\tDEPOT\tTSHIRT-001\tBLANC\tM\t50\n15/02/2026\tBL-001\t1\tCOL-001\tDEPOT\tTSHIRT-001\tBLANC\tL\t30\n15/02/2026\tBL-001\t2\tCOL-002\tDEPOT\tTSHIRT-001\tNOIR\tM\t40"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=bl-fournisseur&Fournisseur=FOURNISSEUR1&Commande=12345",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "bl-fournisseur"
+                },
+                {
+                  "key": "Fournisseur",
+                  "value": "FOURNISSEUR1"
+                },
+                {
+                  "key": "Commande",
+                  "value": "12345"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Commandes Fournisseurs (POST - Text)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "Fournisseur\tDate\tNumero_Commande\tMagasin\tProduit\tCouleur\tTaille\tQuantite\tPrix_Achat\tRemise_Achat\tDevise\tStatut\tDate_Livraison\nFOURNISSEUR1\t15/02/2026\tCMD-001\tPARIS\tTSHIRT-001\tBLANC\tM\t100\t15.00\t0\tEUR\tEn saisie\t01/03/2026\nFOURNISSEUR1\t15/02/2026\tCMD-001\tPARIS\tTSHIRT-001\tNOIR\tM\t50\t15.00\t5\tEUR\tEn saisie\t01/03/2026"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=commandes-fournisseurs&creation-produits=1",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "commandes-fournisseurs"
+                },
+                {
+                  "key": "creation-produits",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Image Stock (POST - Text)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "Magasin\tProduit\tCouleur\tTaille\tStock\nPARIS\tTSHIRT-001\tBLANC\tM\t25\nPARIS\tTSHIRT-001\tBLANC\tL\t18\nPARIS\tTSHIRT-001\tNOIR\tM\t12"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/import?action=image-stock",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "image-stock"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Divers",
+      "item": [
+        {
+          "name": "Import Compteurs Passages (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Magasin\": \"PARIS\",\n    \"Date\": \"2026-01-26\",\n    \"Heure\": \"10:00:00\",\n    \"Compteur\": 1,\n    \"Entrees\": 150,\n    \"Sorties\": 120\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/divers?action=compteurs-passages",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "divers"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "compteurs-passages"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Fournisseurs (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Fournisseur\": \"FOURNISSEUR1\",\n    \"Contact\": \"Jean Dupont\",\n    \"Email\": \"contact@fournisseur1.com\",\n    \"Telephone\": \"+33123456789\",\n    \"Ville\": \"LYON\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/divers?action=fournisseurs",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "divers"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "fournisseurs"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Min Max (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Profil_Stock\": \"STANDARD\",\n    \"Produit\": \"TSHIRT-001\",\n    \"Couleur\": \"BLANC\",\n    \"Taille\": \"M\",\n    \"Mini\": 5,\n    \"Maxi\": 20\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/divers?action=min-max",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "divers"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "min-max"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Champs Perso (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"Nature\": \"produits\",\n    \"Nom\": \"Poids_Net\",\n    \"Clef\": \"TSHIRT-001\",\n    \"Valeur\": \"200g\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/divers?action=champs-perso",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "divers"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "champs-perso"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Envoyer Message (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/divers?action=envoyer-message&magasin-expediteur=OPERA&magasin-destinataire=PARIS&utilisateur-expediteur=ESHOP&message=Veuillez expédier le transfert 123 à PARIS svp",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "divers"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "envoyer-message"
+                },
+                {
+                  "key": "magasin-expediteur",
+                  "value": "OPERA"
+                },
+                {
+                  "key": "magasin-destinataire",
+                  "value": "PARIS"
+                },
+                {
+                  "key": "utilisateur-expediteur",
+                  "value": "ESHOP"
+                },
+                {
+                  "key": "message",
+                  "value": "Veuillez expédier le transfert 123 à PARIS svp"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Requête SQL (POST - Text)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "SELECT Produit, Designation FROM produits LIMIT 5"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/divers?action=query",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "divers"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "query"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Logistique & Négoce",
+      "item": [
+        {
+          "name": "Logistique (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/logistique?action=catalogue&Magasin=PARIS",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "logistique"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "catalogue"
+                },
+                {
+                  "key": "Magasin",
+                  "value": "PARIS"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Logistique (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Entete\": 12345,\n  \"Magasin\": \"MAGASIN1\",\n  \"Caisse\": 1,\n  \"date_reception\": \"2026-01-27\",\n  \"heure_reception\": \"14:30:00\",\n  \"accepter_difference\": 1,\n  \"Produits\": [\n    {\n      \"Produit\": \"CHEMISE01\",\n      \"Couleur\": \"BLEU\",\n      \"Taille\": \"M\",\n      \"Quantite\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/logistique?action=confirmation_reception_transfert",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "logistique"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "confirmation_reception_transfert"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Négoce (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Client\": 138,\n  \"Nature\": \"FACTURE\",\n  \"Magasin\": \"DEPOT\",\n  \"Date\": \"2026-01-27\",\n  \"Produits\": [\n    {\n      \"Produit\": \"CHEMISE01\",\n      \"Couleur\": \"BLEU\",\n      \"Taille\": \"M\",\n      \"Quantite\": 10,\n      \"Prix_Vente\": 45,\n      \"Remise_Vente\": 10,\n      \"Commentaire\": \"Livraison urgente\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/negoce?action=creer_piece",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "negoce"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "creer_piece"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Tax-Free & Rapports",
+      "item": [
+        {
+          "name": "Tax Free Planet PII (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/taxfree?Entete=12345",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "taxfree"
+              ],
+              "query": [
+                {
+                  "key": "Entete",
+                  "value": "12345"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Génération Rapports (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_rapport\": \"12345\",\n  \"parametres\": [\n    {\n      \"name\": \"Date_Debut\",\n      \"value\": \"2026-01-01\"\n    },\n    {\n      \"name\": \"Date_Fin\",\n      \"value\": \"2026-01-31\"\n    }\n  ],\n  \"format\": \"pdf\"\n}"
+            },
+            "url": {
+              "raw": "{{admin_url}}/api/rapports",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "rapports"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Stocks",
+      "item": [
+        {
+          "name": "Stock (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/stock?action=stock&Produit=TSHIRT-001&Couleur=BLANC&Taille=M&Magasins=PARIS;LYON",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "stock"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "stock"
+                },
+                {
+                  "key": "Produit",
+                  "value": "TSHIRT-001"
+                },
+                {
+                  "key": "Couleur",
+                  "value": "BLANC"
+                },
+                {
+                  "key": "Taille",
+                  "value": "M"
+                },
+                {
+                  "key": "Magasins",
+                  "value": "PARIS;LYON"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Image Stocks (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/stock?action=image-stocks&Magasins=PARIS;LYON",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "stock"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "image-stocks"
+                },
+                {
+                  "key": "Magasins",
+                  "value": "PARIS;LYON"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Image Full Stocks (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/stock?action=full-stocks&Magasins=PARIS;LYON",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "stock"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "full-stocks"
+                },
+                {
+                  "key": "Magasins",
+                  "value": "PARIS;LYON"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Web & Utilitaires",
+      "item": [
+        {
+          "name": "Catalogue Web (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/catalogue-web?output-format=json&last-call=2026-01-01 00:00:00&Magasin=PARIS&Produit=TSHIRT-001",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "catalogue-web"
+              ],
+              "query": [
+                {
+                  "key": "output-format",
+                  "value": "json"
+                },
+                {
+                  "key": "last-call",
+                  "value": "2026-01-01 00:00:00"
+                },
+                {
+                  "key": "Magasin",
+                  "value": "PARIS"
+                },
+                {
+                  "key": "Produit",
+                  "value": "TSHIRT-001"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "EAN Existe (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{admin_url}}/api/utilitaires?action=ean-existe&ean=3760123456789",
+              "host": [
+                "{{admin_url}}"
+              ],
+              "path": [
+                "api",
+                "utilitaires"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "ean-existe"
+                },
+                {
+                  "key": "ean",
+                  "value": "3760123456789"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "admin_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+}

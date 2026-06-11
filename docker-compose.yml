@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: local-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-root}
+      POSTGRES_DB: ${DB_NAME:-kort_interior}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-kort_interior}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: local-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend_public_data:/app/dist/public
+    environment:
+      PORT: 5000
+      DB_NAME: ${DB_NAME:-kort_interior}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      DB_HOST: db
+      DB_PORT: 5432
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:5000}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api/v1}
+        NEXT_PUBLIC_IMAGE_URL: ${NEXT_PUBLIC_IMAGE_URL:-http://localhost:5000}
+    container_name: local-frontend
+    ports:
+      - "3005:3000"
+    depends_on:
+      - backend
+
+  admin:
+    build:
+      context: ./admin
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api/v1}
+        NEXT_PUBLIC_IMAGE_URL: ${NEXT_PUBLIC_IMAGE_URL:-http://localhost:5000}
+    container_name: local-admin
+    ports:
+      - "3001:3000"
+    environment:
+      OOPOS_API_KEY: ${OOPOS_API_KEY}
+      OOPOS_ENSEIGNE: ${OOPOS_ENSEIGNE}
+      OOPOS_DOMAIN: ${OOPOS_DOMAIN}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_local_data:
+  backend_public_data:

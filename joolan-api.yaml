@@ -1,0 +1,245 @@
+openapi: 3.0.0
+info:
+  title: Joolan API
+  version: 2.0.0
+  description: API REST pour la gestion des données Joolan (stocks, clients, tickets, produits, logistique, négoce B2B, etc.)
+servers:
+  - url: https://{domain}/api/v2
+    variables:
+      domain:
+        default: www.example.com
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: query
+      name: api-key
+    EnseigneAuth:
+      type: apiKey
+      in: query
+      name: enseigne
+security:
+  - ApiKeyAuth: []
+    EnseigneAuth: []
+paths:
+  /logistique.do:
+    get:
+      summary: API Logistique (GET)
+      tags:
+        - Logistique
+      parameters:
+        - name: action
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [catalogue, attentes_receptions, demandes_expeditions]
+        - name: Magasin
+          in: query
+          schema:
+            type: string
+        - name: tarif
+          in: query
+          schema:
+            type: string
+        - name: last_change
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Succès
+        '400':
+          description: Erreur
+    post:
+      summary: API Logistique (POST)
+      tags:
+        - Logistique
+      responses:
+        '200':
+          description: Succès
+  /recherche-clients.do:
+    post:
+      summary: Rechercher des clients
+      tags:
+        - Clients
+      responses:
+        '200':
+          description: Succès
+  /import-clients.do:
+    post:
+      summary: Importer des clients
+      tags:
+        - Clients
+      responses:
+        '200':
+          description: Succès
+  /export-tickets.do:
+    get:
+      summary: Exporter les tickets d'une journée
+      tags:
+        - Tickets
+      responses:
+        '200':
+          description: Succès
+  /annulation-ticket.do:
+    post:
+      summary: Annuler un ticket
+      tags:
+        - Tickets
+      responses:
+        '200':
+          description: Succès
+  /ticket-pdf.do:
+    get:
+      summary: Générer le PDF d'un ticket
+      tags:
+        - Tickets
+      responses:
+        '200':
+          description: Succès
+  /import-tickets.do:
+    post:
+      summary: Importer des tickets de caisse
+      tags:
+        - Tickets
+      responses:
+        '200':
+          description: Succès
+  /import-produits.do:
+    post:
+      summary: Importer des produits
+      tags:
+        - Import Produits
+      responses:
+        '200':
+          description: Succès
+  /import-tarifs.do:
+    post:
+      summary: Importer des tarifs
+      tags:
+        - Import Produits
+      responses:
+        '200':
+          description: Succès
+  /import-produits-associes.do:
+    post:
+      summary: Importer des produits associés
+      tags:
+        - Import Produits
+      responses:
+        '200':
+          description: Succès
+  /import-receptions.do:
+    post:
+      summary: Importer des réceptions fournisseurs
+      tags:
+        - Import Mouvements
+      responses:
+        '200':
+          description: Succès
+  /import-transferts.do:
+    post:
+      summary: Importer des transferts inter-magasins
+      tags:
+        - Import Mouvements
+      responses:
+        '200':
+          description: Succès
+  /import-bl-fournisseur.do:
+    post:
+      summary: Importer un bon de livraison fournisseur
+      tags:
+        - Import Mouvements
+      responses:
+        '200':
+          description: Succès
+  /import-commandes-fournisseurs.do:
+    post:
+      summary: Importer des commandes fournisseurs
+      tags:
+        - Import Mouvements
+      responses:
+        '200':
+          description: Succès
+  /import-image-stock.do:
+    post:
+      summary: Importer une image de stock
+      tags:
+        - Import Mouvements
+      responses:
+        '200':
+          description: Succès
+  /import-compteurs-passages.do:
+    post:
+      summary: Importer des compteurs de passages
+      tags:
+        - Import Divers
+      responses:
+        '200':
+          description: Succès
+  /import-fournisseurs.do:
+    post:
+      summary: Importer des fournisseurs
+      tags:
+        - Import Divers
+      responses:
+        '200':
+          description: Succès
+  /import-min-max.do:
+    post:
+      summary: Importer des min/max de stock
+      tags:
+        - Import Divers
+      responses:
+        '200':
+          description: Succès
+  /import-champs-perso.do:
+    post:
+      summary: Importer des champs personnalisés
+      tags:
+        - Import Divers
+      responses:
+        '200':
+          description: Succès
+  /envoyer-message.do:
+    post:
+      summary: Envoyer un message inter-magasins
+      tags:
+        - Import Divers
+      responses:
+        '200':
+          description: Succès
+  /query.do:
+    post:
+      summary: Exécuter une requête SQL
+      tags:
+        - Import Divers
+      responses:
+        '200':
+          description: Succès
+  /negoce.do:
+    post:
+      summary: API Négoce B2B
+      tags:
+        - Négoce B2B
+      responses:
+        '200':
+          description: Succès
+  /planet-pii.do:
+    get:
+      summary: Export XML Tax-Free (Planet PII)
+      tags:
+        - Tax-Free
+      responses:
+        '200':
+          description: Succès
+  /generation-rapports.do:
+    post:
+      summary: Générer une URL de rapport
+      tags:
+        - Rapports
+      responses:
+        '200':
+          description: Succès
