@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import axios from 'axios';
 
 const router = Router();
 
@@ -43,18 +44,11 @@ router.get('/instagram', async (_req: Request, res: Response) => {
   try {
     const url = `https://api.scrapecreators.com/v2/instagram/user/posts?handle=${INSTAGRAM_HANDLE}`;
 
-    const response = await fetch(url, {
+    const response = await axios.get(url, {
       headers: { 'x-api-key': apiKey },
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[ScrapeCreators]', response.status, errorText);
-      if (cache) return res.json({ data: cache.data, cached: true, stale: true });
-      return res.status(502).json({ message: 'Erreur ScrapeCreators API', status: response.status });
-    }
-
-    const json = await response.json() as { data?: { items?: any[] }; items?: any[] };
+    const json = response.data as { data?: { items?: any[] }; items?: any[] };
 
     /* ScrapeCreators v2 retourne data.items ou items selon la version */
     const raw: any[] = json?.data?.items ?? json?.items ?? [];
