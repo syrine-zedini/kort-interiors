@@ -113,7 +113,7 @@ export default function SocialSection() {
       </FadeIn>
 
       {/* Boutons de suivi */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "16px", padding: "48px 40px 96px", background: "#faf9f7", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "center", padding: "48px 40px 96px", background: "#faf9f7" }}>
         <a
           href="https://www.instagram.com/kort.interiors/"
           target="_blank"
@@ -130,23 +130,6 @@ export default function SocialSection() {
         >
           <InstagramIcon />
           Suivre @kort.interiors
-        </a>
-        <a
-          href="https://www.facebook.com/kortinteriorslamarsa"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "inline-flex", alignItems: "center", gap: "12px",
-            padding: "14px 40px",
-            border: "1px solid #0e0d0c",
-            fontSize: "9px", letterSpacing: "3px", textTransform: "uppercase",
-            color: "#0e0d0c", textDecoration: "none",
-            transition: "background 0.2s, color 0.2s",
-          }}
-          className="social-follow-btn"
-        >
-          <FacebookIcon />
-          Suivre Kort Interiors
         </a>
       </div>
 

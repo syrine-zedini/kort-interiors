@@ -1,4 +1,4 @@
-import express, { Request } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import authRoutes from './routes/auth.route';
 import categoriesRoutes from './routes/categories.route';
 import fileRoutes from "./routes/file.routes"
@@ -24,7 +24,25 @@ import { getCategoryById } from "./services/categories.service";
 const app = express();
 const version = process.env.API_VERSION || 'v1'
 app.use(express.json());
-app.use(cors()); // <-- This allows all origins *
+
+// Warn if ALLOWED_ORIGINS is missing in production environment
+if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
+  console.warn("⚠️ WARNING: ALLOWED_ORIGINS is not defined in production. Using localhost defaults.");
+}
+
+app.use(cors({
+  origin: (origin, callback) => {
+    const originsEnv = process.env.ALLOWED_ORIGINS;
+    const allowed = (originsEnv || 'http://localhost:3005,http://localhost:3000')
+      .split(',').map(o => o.trim());
+    if (!origin || allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  credentials: true,
+}));
 
 app.use(
   "/public",
@@ -78,6 +96,22 @@ app.get("/:slug([a-z0-9]+(?:-[a-z0-9]+)*)", async (req: Request<{ slug: string }
       return next();
     }
   }
+});
+
+// Global Error Handler Middleware
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error('[Global Error Handler]:', err);
+
+  const status = err.status || err.statusCode || 500;
+  const message = process.env.NODE_ENV === 'production' && status === 500
+    ? 'Internal Server Error'
+    : err.message || 'An unexpected error occurred';
+
+  res.status(status).json({
+    success: false,
+    message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  });
 });
 
 export default app;

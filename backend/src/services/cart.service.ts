@@ -5,6 +5,10 @@ import { ProductVariant } from '../models/product_variant';
 import { ProductItem } from '../models/product_item.model';
 import { Op } from 'sequelize';
 import { getApplicablePromotion, calculateFinalPrice } from './promotion.service';
+import { getProductById } from './product.service';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUUID = (s?: string | null): boolean => !!s && UUID_RE.test(s);
 
 interface AddToCartInput {
   userId: string;
@@ -40,9 +44,12 @@ export const addToCart = async (input: AddToCartInput) => {
     throw new Error('Quantity must be at least 1');
   }
 
-  // Get product to verify it exists and get price
-  const product = await Product.findByPk(productId);
-  if (!product) {
+  // ✅ CORRECTION : Use getProductById instead of Product.findByPk
+  // This works with both local products (UUID) and Oopos products (codes)
+  let product;
+  try {
+    product = await getProductById(productId);
+  } catch (err) {
     throw new Error('Product not found');
   }
 
@@ -166,29 +173,50 @@ export const clearCart = async (userId: string) => {
  * Get all cart items for a user with product details
  */
 export const getUserCart = async (userId: string) => {
+  // Fetch cart items WITHOUT Product include to avoid UUID type mismatch
+  // (OOPOS productIds like "oopos-1093" are TEXT, but products.id is UUID)
   const cartItems = await CartItem.findAll({
     where: { userId },
-    include: [
-      {
-        model: Product,
-        as: 'product',
-        attributes: ['id', 'name', 'description', 'images', 'price', 'discount', 'sizeMaterialPricing', 'categoryId'],
-      },
-    ],
     order: [['createdAt', 'DESC']],
   });
 
-  // Fetch color details for all items
-  const colorIds = [...new Set(cartItems.map(item => item.selectedColor).filter(Boolean))] as string[];
+  // Fetch local products only for cart items with valid UUID productIds
+  const localProductIds = [...new Set(cartItems.map(i => i.productId).filter(isUUID))];
+  const localProducts = localProductIds.length > 0
+    ? await Product.findAll({
+        where: { id: localProductIds },
+        attributes: ['id', 'name', 'description', 'images', 'price', 'discount', 'sizeMaterialPricing', 'categoryId'],
+      })
+    : [];
+  const localProductMap = new Map(localProducts.map((p: any) => [p.id, p.toJSON()]));
+
+  // Fetch OOPOS product details (images, name, price) for non-UUID productIds
+  const ooposProductIds = [...new Set(cartItems.map(i => i.productId).filter(id => !isUUID(id)))];
+  const ooposProductMap = new Map<string, any>();
+  await Promise.all(ooposProductIds.map(async (productId) => {
+    try {
+      const p = await getProductById(productId);
+      ooposProductMap.set(productId, p);
+    } catch { /* OOPOS product not found, leave null */ }
+  }));
+
+  // Attach local or OOPOS product to each cart item
+  const cartItemsWithProduct: any[] = cartItems.map(item => ({
+    ...(item.toJSON() as any),
+    product: localProductMap.get(item.productId) ?? ooposProductMap.get(item.productId) ?? null,
+  }));
+
+  // Fetch color details — only for UUID-format selectedColors (local DB colors)
+  const colorIds = [...new Set(cartItems.map(item => item.selectedColor).filter(isUUID))] as string[];
   const colors = colorIds.length > 0 ? await Color.findAll({
     where: { id: colorIds },
     attributes: ['id', 'nameFr'],
   }) : [];
-  
+
   const colorMap = new Map(colors.map(c => [c.id, c.nameFr]));
 
-
-  const cartProductIds = [...new Set(cartItems.map((item) => item.productId))];
+  // Fetch product items only for local UUID productIds
+  const cartProductIds = [...new Set(cartItems.map((item) => item.productId).filter(isUUID))];
   const productItems = cartProductIds.length > 0
     ? await ProductItem.findAll({
         where: { productId: cartProductIds },
@@ -207,8 +235,8 @@ export const getUserCart = async (userId: string) => {
   }
 
   // Map cart items with color names
-  const itemsWithColors = cartItems.map(item => {
-    const itemData = item.toJSON() as any;
+  const itemsWithColors = cartItemsWithProduct.map(item => {
+    const itemData = item;
     const isEncodedPiece = typeof item.selectedSize === "string" && item.selectedSize.startsWith("__item__:");
     const piecePayload = isEncodedPiece ? item.selectedSize!.replace("__item__:", "") : "";
     const [pieceIdRaw, ...pieceSizeParts] = piecePayload.split(":");
@@ -266,10 +294,10 @@ export const getUserCart = async (userId: string) => {
     };
   });
 
-  // Enrich products with promotion data
+  // Enrich products with promotion data (local DB products only — OOPOS products have no UUID id)
   const enrichedItems = await Promise.all(
     itemsWithColors.map(async (item: any) => {
-      if (item.product) {
+      if (item.product && isUUID(item.product.id)) {
         const promotion = await getApplicablePromotion(item.product);
 
         // Add promotion data to the product
@@ -319,14 +347,12 @@ export const getUserCart = async (userId: string) => {
  * Get single cart item
  */
 export const getCartItem = async (cartItemId: string) => {
-  return await CartItem.findByPk(cartItemId, {
-    include: [
-      {
-        model: Product,
-        as: 'product',
-      },
-    ],
-  });
+  const cartItem = await CartItem.findByPk(cartItemId);
+  if (!cartItem) return null;
+  const product = isUUID(cartItem.productId)
+    ? await Product.findByPk(cartItem.productId)
+    : null;
+  return { ...(cartItem.toJSON() as any), product };
 };
 
 // ─── Cart Calculations ──────────────────────────────────────────────────────
@@ -335,26 +361,27 @@ export const getCartItem = async (cartItemId: string) => {
  * Calculate cart subtotal and item count
  */
 export const calculateCartSubtotal = async (userId: string): Promise<CartCalculations> => {
-  const cartItems = await CartItem.findAll({
-    where: { userId },
-    include: [
-      {
-        model: Product,
-        as: 'product',
+  const cartItems = await CartItem.findAll({ where: { userId } });
+
+  // Fetch local products only for UUID productIds (skip OOPOS items)
+  const localIds = [...new Set(cartItems.map(i => i.productId).filter(isUUID))];
+  const localProducts = localIds.length > 0
+    ? await Product.findAll({
+        where: { id: localIds },
         attributes: ['id', 'name', 'description', 'images', 'price', 'discount', 'sizeMaterialPricing', 'categoryId'],
-      },
-    ],
-  });
+      })
+    : [];
+  const productMap = new Map(localProducts.map((p: any) => [p.id, p.toJSON()]));
 
   let subtotal = 0;
   let itemCount = 0;
 
-  for (const item of cartItems as any) {
+  for (const item of cartItems) {
     let itemPrice = Number(item.priceAtPurchase);
+    const product = productMap.get(item.productId);
 
-    // Apply promotion if product has one
-    if (item.product) {
-      const promotion = await getApplicablePromotion(item.product);
+    if (product) {
+      const promotion = await getApplicablePromotion(product);
       if (promotion) {
         const priceWithPromotion = calculateFinalPrice(itemPrice, promotion);
         itemPrice = priceWithPromotion.finalPrice;
@@ -433,12 +460,16 @@ export const getProductPrice = async (
   selectedMaterial?: string,
   selectedItemId?: string
 ): Promise<number> => {
-  const product = await Product.findByPk(productId);
-  if (!product) {
+  // ✅ CORRECTION : Use getProductById instead of Product.findByPk
+  // This works with both local products (UUID) and Oopos products (codes)
+  let product;
+  try {
+    product = await getProductById(productId);
+  } catch (err) {
     throw new Error('Product not found');
   }
 
-  if (selectedItemId) {
+  if (selectedItemId && isUUID(productId)) {
     const item = await ProductItem.findOne({
       where: {
         id: selectedItemId,
@@ -479,8 +510,8 @@ export const getProductPrice = async (
     return Number((product as any).sizeMaterialPricing[selectedSize][selectedMaterial]);
   }
 
-  // If product has variants with different prices
-  if (selectedSize || selectedColor) {
+  // If product has variants with different prices (local DB products only)
+  if (isUUID(productId) && (selectedSize || selectedColor)) {
     const variant = await ProductVariant.findOne({
       where: {
         productId,
@@ -495,8 +526,8 @@ export const getProductPrice = async (
   }
 
   // Return base product price
-  if (product.price) {
-    return Number(product.price);
+  if ((product as any).price) {
+    return Number((product as any).price);
   }
 
   throw new Error('Product price not available');

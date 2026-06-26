@@ -15,15 +15,42 @@ import {
     deleteProductVariant,
     getCategoryVariants,
 } from "../services/product.service";
+import { getMagasinsDisponibles } from "../services/joolan.service";
 
 const router = Router();
 
 /**
  * @swagger
- * tags:
- *   name: Products
- *   description: Manage products and their variants
+ * /products/debug/magasins:
+ *   get:
+ *     summary: Liste tous les magasins disponibles dans OOPOS (diagnostic)
+ *     description: >
+ *       Retourne la liste distincte des noms de magasins trouvés dans le
+ *       catalogue OOPOS (sans filtre). Utile pour trouver la valeur exacte
+ *       à mettre dans la variable OOPOS_MAGASIN du fichier .env.
+ *     tags: [Products]
+ *     responses:
+ *       200:
+ *         description: Liste des magasins
  */
+router.get("/debug/magasins", async (req, res) => {
+    try {
+        const magasins = await getMagasinsDisponibles();
+        const currentMagasin = process.env.OOPOS_MAGASIN || '(non défini)';
+        res.json({
+            message: "Liste des magasins disponibles dans le catalogue OOPOS",
+            currentFilter: currentMagasin,
+            magasins,
+            tip: magasins.length > 0
+                ? `Ajoutez OOPOS_MAGASIN=<nom_du_magasin> dans votre .env puis redémarrez le backend`
+                : "Aucun champ Magasin trouvé dans les produits OOPOS"
+        });
+    } catch (err: any) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+
 
 /**
  * @swagger
@@ -183,7 +210,8 @@ router.get("/", async (req, res) => {
         const search = req.query.search as string | undefined;
         const color = req.query.color as string | undefined;
         const size = req.query.size as string | undefined;
-        const products = await getAllProducts(search, { color, size });
+        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
+        const products = await getAllProducts(search, { color, size, showAll });
         res.json(products);
     } catch (err: any) {
         res.status(400).json({ message: err.message });
@@ -211,36 +239,9 @@ router.get("/", async (req, res) => {
  */
 router.get("/by-code/:code", async (req, res) => {
     try {
-        const products = await getProductsByCode(req.params.code);
+        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
+        const products = await getProductsByCode(req.params.code, showAll);
         res.json(products);
-    } catch (err: any) {
-        res.status(404).json({ message: err.message });
-    }
-});
-
-/**
- * @swagger
- * /{id}:
- *   get:
- *     summary: Get a product by UUID or slug
- *     tags: [Products]
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *         required: true
- *         description: Product UUID or slug (e.g., 74876fcf-20f7-4147-bf3d-423d9021b73e or art-de-table)
- *     responses:
- *       200:
- *         description: Product object
- *       404:
- *         description: Product not found
- */
-router.get("/:id", async (req, res) => {
-    try {
-        const product = await getProductById(req.params.id);
-        res.json(product);
     } catch (err: any) {
         res.status(404).json({ message: err.message });
     }
@@ -363,7 +364,8 @@ router.delete("/:id", async (req, res) => {
 router.get("/category/:categoryId", async (req, res) => {
     try {
         const { categoryId } = req.params;
-        const products = await getProductsByCategoryId(categoryId);
+        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
+        const products = await getProductsByCategoryId(categoryId, showAll);
         res.json(products);
     } catch (err: any) {
         res.status(400).json({ message: err.message });
@@ -390,10 +392,39 @@ router.get("/category/:categoryId", async (req, res) => {
 router.get("/category/:categoryId/variants", async (req, res) => {
     try {
         const { categoryId } = req.params;
-        const products = await getCategoryVariants(categoryId);
+        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
+        const products = await getCategoryVariants(categoryId, showAll);
         res.json(products);
     } catch (err: any) {
         res.status(400).json({ message: err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /{id}:
+ *   get:
+ *     summary: Get a product by UUID or slug
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Product UUID or slug
+ *     responses:
+ *       200:
+ *         description: Product object
+ *       404:
+ *         description: Product not found
+ */
+router.get("/:id", async (req, res) => {
+    try {
+        const product = await getProductById(req.params.id);
+        res.json(product);
+    } catch (err: any) {
+        res.status(404).json({ message: err.message });
     }
 });
 

@@ -6,6 +6,7 @@ export interface UserProfile {
   email: string;
   phoneNumber: string;
   address?: string;
+  role?: string;
 }
 
 export interface UpdateProfileData {
@@ -18,7 +19,7 @@ export interface UpdateProfileData {
 }
 
 export const getUserProfile = async (): Promise<UserProfile> => {
-  const response = await api.get('/users/me');
+  const response = await api.get('/users/profile');
   return response.data;
 };
 

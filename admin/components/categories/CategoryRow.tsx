@@ -16,6 +16,8 @@ interface CategoryRowProps {
   onManageBanner?: (category: CategoryNode) => void;
   renamingId: string | null;
   setRenamingId: (id: string | null) => void;
+  /** When true, hides rename/delete/add/manage-parents buttons */
+  readOnly?: boolean;
 }
 
 export default function CategoryRow({
@@ -29,6 +31,7 @@ export default function CategoryRow({
   onManageBanner,
   renamingId,
   setRenamingId,
+  readOnly = false,
 }: CategoryRowProps) {
   const isEditing = renamingId === category.id;
   const [draft, setDraft] = useState(category.name);
@@ -142,7 +145,7 @@ export default function CategoryRow({
           </>
         ) : (
           <>
-            {onAddChild && (
+            {!readOnly && onAddChild && (
               <button
                 onClick={() => onAddChild(category.id)}
                 className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
@@ -151,7 +154,7 @@ export default function CategoryRow({
                 <Plus size={15} />
               </button>
             )}
-            {onManageParents && (
+            {!readOnly && onManageParents && (
               <button
                 onClick={() => onManageParents(category)}
                 className="p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
@@ -164,8 +167,8 @@ export default function CategoryRow({
               <button
                 onClick={() => onManageBanner(category)}
                 className={`p-1.5 rounded-lg transition-colors ${
-                  category.banner 
-                    ? "text-amber-500 bg-amber-50" 
+                  category.banner
+                    ? "text-amber-500 bg-amber-50"
                     : "text-gray-400 hover:text-amber-600 hover:bg-amber-50 opacity-0 group-hover:opacity-100"
                 }`}
                 title="Gérer la bannière"
@@ -173,20 +176,24 @@ export default function CategoryRow({
                 <Image size={15} />
               </button>
             )}
-            <button
-              onClick={() => setRenamingId(category.id)}
-              className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-              title="Renommer"
-            >
-              <Pencil size={15} />
-            </button>
-            <button
-              onClick={() => onDelete(category)}
-              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-              title="Supprimer"
-            >
-              <Trash2 size={15} />
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => setRenamingId(category.id)}
+                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                title="Renommer"
+              >
+                <Pencil size={15} />
+              </button>
+            )}
+            {!readOnly && (
+              <button
+                onClick={() => onDelete(category)}
+                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                title="Supprimer"
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
           </>
         )}
       </div>

@@ -166,11 +166,13 @@ export default function OrdersPage() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {order.items?.map((item) => {
-                        const img = item.product?.images ? resolveImg(
-                          typeof item.product.images === 'string' 
-                            ? item.product.images 
-                            : JSON.stringify(item.product.images)
-                        ) : undefined;
+                        const rawImages = item.product?.images;
+                        const imageArray: string[] = Array.isArray(rawImages)
+                          ? rawImages
+                          : typeof rawImages === 'string' && rawImages.startsWith('[')
+                            ? (() => { try { return JSON.parse(rawImages); } catch { return []; } })()
+                            : rawImages ? [rawImages] : [];
+                        const img = imageArray[0] ? resolveImg(imageArray[0]) : undefined;
                         
                         return (
                           <div key={item.id} style={{ display: 'flex', gap: 16, alignItems: 'center' }}>

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { auth } from '../middleware/auth';
-import { User } from '../models';
+import { User, Role } from '../models';
 import { Commande } from '../models/commande.model';
 import { sequelize } from '../config/sequelize';
 import { fn, col, literal, Op, where } from 'sequelize';
@@ -71,6 +71,37 @@ router.get('/me', auth, async (req, res) => {
       email: user.email,
       phoneNumber: user.phoneNumber,
       address: user.address,
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: 'Error fetching user profile', error: err.message });
+  }
+});
+
+// GET /api/v1/users/profile - Get current user's profile with role (protected)
+router.get('/profile', auth, async (req, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'username', 'email', 'phoneNumber', 'address'],
+      include: [{ model: Role, as: 'role' }],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const userJson = user.toJSON() as any;
+
+    res.json({
+      id: userJson.id,
+      username: userJson.username,
+      email: userJson.email,
+      phoneNumber: userJson.phoneNumber,
+      address: userJson.address,
+      role: userJson.role?.name,
     });
   } catch (err: any) {
     res.status(500).json({ message: 'Error fetching user profile', error: err.message });

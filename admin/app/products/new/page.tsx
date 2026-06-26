@@ -16,16 +16,21 @@ export default function NewProductPage() {
 
   const mut = useMutation({
     mutationFn: createProduct,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["products"] });
-      router.push("/products");
+    onSuccess: (result: any) => {
+      qc.invalidateQueries({ queryKey: ["oopos-catalogue"] });
+      const code = result?.code ?? "";
+      router.push(`/products${code ? `?newCode=${encodeURIComponent(code)}` : ""}`);
     },
     onError: (e: any) => setError(e?.response?.data?.message ?? "Erreur lors de la création"),
   });
 
   const handleSubmit = async (data: CreateProductPayload) => {
     setError(null);
-    await mut.mutateAsync(data);
+    try {
+      await mut.mutateAsync(data);
+    } catch {
+      // error is handled by onError callback above
+    }
   };
 
   return (

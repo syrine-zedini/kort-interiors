@@ -47,13 +47,8 @@ CommandeItem.init(
       onDelete: 'CASCADE',
     },
     productId: {
-      type: DataTypes.UUID,
+      type: DataTypes.STRING,
       allowNull: false,
-      references: {
-        model: Product,
-        key: 'id',
-      },
-      onDelete: 'CASCADE',
     },
     quantity: {
       type: DataTypes.INTEGER,

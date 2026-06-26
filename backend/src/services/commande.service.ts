@@ -1,76 +1,132 @@
+import { CartItem } from '../models/cart_item.model';
 import { Commande } from '../models/commande.model';
 import { CommandeItem } from '../models/commande_item.model';
-import { CartItem } from '../models/cart_item.model';
 import { User } from '../models/user.model';
 import { calculateCartTotals } from './cart.service';
-import { sequelize } from '../config/sequelize';
+import * as joolanService from './joolan.service';
+
+const OOPOS_MAGASIN = process.env.OOPOS_MAGASIN || 'SOUKRA';
+
+/** Strip "oopos-" prefix → raw OOPOS product code */
+function getProductCode(productId: string): string {
+  return productId.startsWith('oopos-') ? productId.replace('oopos-', '') : productId;
+}
+
+/** Strip encoded piece format "__item__:{id}:{size}" → clean size string */
+function cleanSize(selectedSize?: string | null): string {
+  if (!selectedSize) return '';
+  if (selectedSize.startsWith('__item__:')) {
+    const parts = selectedSize.replace('__item__:', '').split(':');
+    return parts.slice(1).join(':') || '';
+  }
+  return selectedSize;
+}
 
 export const placeOrder = async (
   userId: string,
   shippingAddress?: any,
-  billingAddress?: any,
+  _billingAddress?: any,
   paymentMethod?: string
 ) => {
-  // Validate required fields
-  if (!shippingAddress) {
-    throw new Error('Shipping address is required');
-  }
+  if (!shippingAddress) throw new Error('Shipping address is required');
 
-  // Fetch user and validate phone number
   const user = await User.findByPk(userId);
-  if (!user) {
-    throw new Error('User not found');
-  }
-  if (!user.phoneNumber) {
-    throw new Error('Phone number is required');
-  }
+  if (!user) throw new Error('User not found');
+  if (!user.phoneNumber) throw new Error('Phone number is required');
 
-  // Get cart items and totals
   const cartItems = await CartItem.findAll({ where: { userId } });
-  if (cartItems.length === 0) {
-    throw new Error('Cart is empty');
-  }
+  if (cartItems.length === 0) throw new Error('Cart is empty');
 
   const totals = await calculateCartTotals(userId);
 
-  // Start transaction
-  const transaction = await sequelize.transaction();
+  // Build OOPOS ticket per the official import-tickets.do spec
+  const ticketId = `KORT-${Date.now()}`;
 
-  try {
-    // 1. Create Commande
-    const commande = await Commande.create(
+  const modeRegCB = process.env.OOPOS_MODEREG_CB || '300';   // CARTES
+  const modeRegESP = process.env.OOPOS_MODEREG_ESP || '100'; // ESPECES
+
+  const ooposTicket: any = {
+    ID: ticketId,
+    Caisse: 1,
+    Nature: 'VENTE',
+    Vendeur: process.env.OOPOS_VENDEUR || 'SARA',
+    Lignes: cartItems.map((item) => ({
+      Produit: getProductCode(item.productId),
+      Couleur: item.selectedColor || '',
+      Taille: cleanSize(item.selectedSize),
+      Quantite: item.quantity,
+      Prix_Vente: Number(item.priceAtPurchase),
+      Remise_Vente: 0,
+    })),
+    Reglements: [
       {
-        userId,
-        status: 'pending',
-        totalAmount: totals.grandTotal,
-        shippingAddress,
-        billingAddress,
-        paymentMethod,
-        paymentStatus: 'unpaid',
+        ModeReg: paymentMethod === 'on_delivery' ? modeRegESP : modeRegCB,
+        Libelle: paymentMethod === 'on_delivery' ? 'PAIEMENT A LA LIVRAISON' : 'CARTE BANCAIRE',
+        Montant: totals.subtotal,
       },
-      { transaction }
-    );
+    ],
+  };
 
-    // 2. Create CommandeItems and deduct stock
-    const commandeItemsData = cartItems.map((item) => ({
+  ooposTicket.Magasin = OOPOS_MAGASIN;
+
+  // Send to OOPOS — wrap in try/catch to surface the real OOPOS error message
+  let ooposResult: any;
+  try {
+    ooposResult = await joolanService.importTickets([ooposTicket], {
+      Magasins_Stocks: "'SOUKRA','MARSA'",
+    });
+  } catch (err: any) {
+    const ooposMsg =
+      err?.response?.data?.error_message ??
+      err?.response?.data?.message ??
+      err?.message ??
+      'Erreur OOPOS inconnue';
+    throw new Error(`OOPOS a refusé la commande : ${ooposMsg}`);
+  }
+
+  if (ooposResult?.result === 'ko') {
+    // Per the Joolan doc, per-ticket errors are in data[].Erreur
+    const ticketError =
+      ooposResult?.data?.[0]?.Erreur ??
+      ooposResult?.error_message ??
+      JSON.stringify(ooposResult?.data ?? ooposResult);
+    throw new Error(`OOPOS a refusé la commande : ${ticketError}`);
+  }
+
+  // OOPOS returns the assigned ticket number in data[0].Entete
+  const entete = ooposResult?.data?.[0]?.Entete ?? null;
+
+  // Save a reference record in PostgreSQL so the orders page can display history
+  const commande = await Commande.create({
+    userId,
+    status: 'pending',
+    totalAmount: totals.subtotal,
+    shippingAddress: { address: shippingAddress },
+    paymentMethod: paymentMethod || 'on_delivery',
+    paymentStatus: paymentMethod === 'on_delivery' ? 'unpaid' : 'paid',
+    trackingNumber: entete ? String(entete) : ticketId,
+  });
+
+  await Promise.all(cartItems.map((item) =>
+    CommandeItem.create({
       commandeId: commande.id,
       productId: item.productId,
       quantity: item.quantity,
-      priceAtPurchase: item.priceAtPurchase,
-      selectedSize: item.selectedSize,
-      selectedColor: item.selectedColor,
-    }));
+      priceAtPurchase: Number(item.priceAtPurchase),
+      selectedSize: item.selectedSize ?? undefined,
+      selectedColor: item.selectedColor ?? undefined,
+    })
+  ));
 
-    await CommandeItem.bulkCreate(commandeItemsData, { transaction });
+  // Clear the cart now that OOPOS has the order
+  await CartItem.destroy({ where: { userId } });
 
-    // 3. Clear Cart
-    await CartItem.destroy({ where: { userId }, transaction });
-
-    await transaction.commit();
-
-    return commande;
-  } catch (error) {
-    await transaction.rollback();
-    throw error;
-  }
+  return {
+    success: true,
+    entete,
+    id: ticketId,
+    message: entete
+      ? `Commande enregistrée dans OOPOS (ticket n°${entete})`
+      : 'Commande enregistrée dans OOPOS',
+  };
 };

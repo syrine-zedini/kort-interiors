@@ -19,8 +19,113 @@ const MATERIAL_ONLY_SIZE_KEY = "__material_only__";
 
 function resolveImg(path: string | undefined): string {
     if (!path) return "/placeholder.png";
-    return path.startsWith("http") ? path : `${IMAGE_BASE}${path}`;
+    if (path.startsWith("/assets/") || path.startsWith("http")) return path;
+    return `${IMAGE_BASE}${path}`;
 }
+
+// ✅ FONCTION UTILITAIRE: Générer une couleur hex à partir d'un nom de couleur
+const generateColorHex = (colorName: string): string => {
+    // Map de couleurs communes français → hex
+    const colorMap: Record<string, string> = {
+        // Blancs / Crèmes
+        "blanc": "#FFFFFF",
+        "blanc casse": "#F8F4EC",
+        "blanc casse2": "#F0EAD6",
+        "ivoire": "#FFFFF0",
+        "creme": "#FFFDD0",
+        "crème": "#FFFDD0",
+        "ecru": "#F0DFB4",
+        // Gris / Argent / Anthracite
+        "gris": "#808080",
+        "gris clair": "#D3D3D3",
+        "gris fonce": "#4A4A4A",
+        "anthracite": "#383838",
+        "argent": "#C0C0C0",
+        "chrome": "#C0C0C0",
+        "titan": "#5A6472",
+        "platine": "#E5E4E2",
+        // Noirs
+        "noir": "#000000",
+        // Bleus
+        "bleu": "#4169E1",
+        "bleu clair": "#ADD8E6",
+        "bleu marine": "#000080",
+        "bleu nuit": "#0D1B2A",
+        "bleunuit": "#0D1B2A",
+        "navy": "#001F5B",
+        "indigo": "#4B0082",
+        "denim": "#1560BD",
+        // Verts
+        "vert": "#228B22",
+        "vert clair": "#90EE90",
+        "vert kaki": "#4B5320",
+        "kaki": "#5C5A1E",
+        "sauge": "#7C9D74",
+        "menthe": "#3EB489",
+        "emeraude": "#50C878",
+        "olive": "#808000",
+        "foret": "#228B22",
+        // Rouges / Roses / Fuchsia
+        "rouge": "#CC1818",
+        "bordeaux": "#800020",
+        "grenat": "#6B0F1A",
+        "framboise": "#C72C48",
+        "rose": "#FF69B4",
+        "rose clair": "#FFB6C1",
+        "rose fushia": "#FF1493",
+        "fushia": "#FF1493",
+        "fuchsia": "#FF1493",
+        "dahlia": "#BC3F7C",
+        // Oranges / Corail / Saumon
+        "orange": "#FFA500",
+        "corail": "#FF7F50",
+        "saumon": "#FA8072",
+        "terracotta": "#E2725B",
+        "rouille": "#A0522D",
+        // Jaunes / Or / Dorés
+        "jaune": "#FFD700",
+        "or": "#FFD700",
+        "gold": "#FFD700",
+        "dore": "#DAA520",
+        "doré": "#DAA520",
+        "dore-jaune": "#DAA520",
+        "doré-jaune": "#DAA520",
+        "modoré": "#8B6914",
+        "modore": "#8B6914",
+        "mordore": "#8B6914",
+        "mordoré": "#8B6914",
+        "ocre": "#CC7722",
+        "moutarde": "#C8A415",
+        // Bruns / Camel / Taupe
+        "marron": "#A52A2A",
+        "chocolat": "#7B3F00",
+        "brun": "#964B00",
+        "camel": "#C19A6B",
+        "caramel": "#C68E5B",
+        "noisette": "#9C6B30",
+        "taupe": "#7A6A58",
+        "beige": "#D4B896",
+        "lin": "#E8D5B7",
+        "sable": "#D4B896",
+        "angora": "#E8D5C4",
+        // Violets / Lilas / Lavande
+        "violet": "#800080",
+        "mauve": "#E0B0FF",
+        "lilas": "#C8A2C8",
+        "lavande": "#B57EDC",
+        "prune": "#4E1A45",
+        // Autres
+        "turquoise": "#40E0D0",
+        "transparent": "rgba(200,200,200,0.5)",
+        "multicolore": "linear-gradient(135deg, #f00, #0f0, #00f)",
+    };
+
+    const normalized = colorName.toLowerCase().trim()
+        .normalize("NFD").replace(/[̀-ͯ]/g, ""); // strip accents for fallback
+    const normalizedWithAccents = colorName.toLowerCase().trim();
+    return colorMap[normalizedWithAccents] ?? colorMap[normalized] ?? "#d1d5db";
+};
+
 
 export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categorySlug, initialColor, initialSize }) => {
     const router = useRouter();
@@ -148,12 +253,22 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
 
     const colorMap = useMemo(() => allColors, [allColors]);
 
-    const colorOptions = Array.from(new Set<string>(rawColorIds)).map((id: string) => {
-        const meta = colorMap[id];
+    // ✅ CORRECTION: Map color names to hex values
+    const colorOptions = Array.from(new Set<string>(rawColorIds)).map((colorName: string) => {
+        // First try to find in allColors (UUID-based)
+        const meta = colorMap[colorName];
+        if (meta) {
+            return {
+                key: colorName,
+                hex: meta.hex,
+                label: meta.nameFr,
+            };
+        }
+        // If not found, treat colorName as a string and generate hex
         return {
-            key: id,
-            hex: meta?.hex ?? "#d1d5db",
-            label: meta?.nameFr ?? "",
+            key: colorName,
+            hex: generateColorHex(colorName),
+            label: colorName, // Use the color name directly as label
         };
     });
     const materials = product.sizeMaterialPricingWithPromotion?.[effectiveSelectedSize]
@@ -162,10 +277,11 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
             ? Object.keys(product.sizeMaterialPricing[effectiveSelectedSize])
             : []);
 
-    // Derive selected color name for display
+    // ✅ CORRECTION: Derive selected color name for display (now it's a string)
     const selectedColorMeta = selectedColorId ? colorMap[selectedColorId] : undefined;
     const selectedColorName =
         selectedColorMeta?.nameFr ??
+        selectedColorId ?? // ✅ PRIORITÉ: Use selectedColorId directly (it's the color name)
         selectedVariant?.colorData?.nameFr ??
         selectedVariant?.color ??
         "";
@@ -216,6 +332,13 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                             const matchingVariant = product.variants?.find(
                                 (v) => v.color === matchById.id && (!initialSize || v.size === initialSize)
                             ) ?? product.variants?.find((v) => v.color === matchById.id);
+                            if (matchingVariant) setSelectedVariant(matchingVariant);
+                        } else {
+                            // ✅ AJOUTÉ: Try matching as a color name string
+                            setSelectedColorId(initialColor);
+                            const matchingVariant = product.variants?.find(
+                                (v) => v.color?.toLowerCase() === initialColor.toLowerCase()
+                            );
                             if (matchingVariant) setSelectedVariant(matchingVariant);
                         }
                     }
@@ -280,26 +403,35 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
         e.stopPropagation();
     };
 
-    // Handle color selection and navigate to the correct product variant if needed
+    // ✅ CORRECTION: Handle color selection (now colorId can be a string like "ROSE CLAIR")
     const handleColorSelect = (colorId: string, colorName: string) => {
         // Find which product has this color
         const targetProduct = (relatedProducts.length > 0 ? relatedProducts : [product]).find((p) => {
             // Check if color is in product colors
             if (p.colors && p.colors.includes(colorId)) return true;
-            // Check if color is in variant colors
-            if (p.variants?.some((v) => v.color === colorId)) return true;
+            // Check if color is in variant colors (now string comparison)
+            if (p.variants?.some((v) => v.color === colorId || v.color?.toLowerCase() === colorId.toLowerCase())) return true;
             return false;
         });
 
         if (targetProduct && targetProduct.slug !== product.slug) {
             // Navigate to the product variant that has this color
-            const targetVariant = targetProduct.variants?.find((v) => v.color === colorId);
+            const targetVariant = targetProduct.variants?.find((v) => v.color === colorId || v.color?.toLowerCase() === colorId.toLowerCase());
             const categorySlugParam = categorySlug ? `/${categorySlug}` : "";
             const newPath = `/products${categorySlugParam}/${targetProduct.slug}?color=${colorName}`;
             router.push(newPath);
         } else {
             // Same product, just update color selection
             setSelectedColorId(colorId);
+            
+            // ✅ AJOUTÉ: Also update selectedVariant to match the new color
+            const matchingVariant = product.variants?.find((v) => 
+                v.color === colorId || v.color?.toLowerCase() === colorId.toLowerCase()
+            );
+            if (matchingVariant) {
+                setSelectedVariant(matchingVariant);
+            }
+            
             updateQueryParams({ color: colorName });
         }
     };

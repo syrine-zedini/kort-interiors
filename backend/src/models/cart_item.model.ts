@@ -48,13 +48,11 @@ CartItem.init(
       },
       onDelete: 'CASCADE',
     },
+    // ✅ CORRECTION : Changé de DataTypes.UUID à DataTypes.STRING
+    // Cela permet de stocker les codes Oopos (1093, EE1612E, OREILLER 60/60, etc.)
     productId: {
-      type: DataTypes.UUID,
+      type: DataTypes.STRING,
       allowNull: false,
-      references: {
-        model: Product,
-        key: 'id',
-      },
       onDelete: 'CASCADE',
     },
     quantity: {

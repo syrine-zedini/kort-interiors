@@ -7,9 +7,15 @@ const OOPOS_DOMAIN = process.env.OOPOS_DOMAIN || 'caisse.oopos.fr';
 const BASE_URL = `https://${OOPOS_DOMAIN}/api/v2`;
 const ENSEIGNE = process.env.OOPOS_ENSEIGNE;
 const API_KEY = process.env.OOPOS_API_KEY;
+const OOPOS_MAGASIN = process.env.OOPOS_MAGASIN || '';
 
 if (!ENSEIGNE || !API_KEY) {
   console.warn("⚠️ Attention : Les variables OOPOS_ENSEIGNE ou OOPOS_API_KEY sont manquantes dans le fichier .env");
+}
+if (OOPOS_MAGASIN) {
+  console.log(`✅ Filtre magasin actif : OOPOS_MAGASIN="${OOPOS_MAGASIN}"`);
+} else {
+  console.warn("⚠️ OOPOS_MAGASIN non défini dans .env - tous les produits de l'enseigne seront retournés (sans filtre magasin)");
 }
 
 const joolanClient = axios.create({
@@ -39,6 +45,9 @@ const genericPost = async (path: string, data: any = {}, params: any = {}) => {
     return response.data;
   } catch (error: any) {
     console.error(`Erreur POST ${path}:`, error.message);
+    if (error?.response?.data) {
+      console.error(`OOPOS response body:`, JSON.stringify(error.response.data));
+    }
     throw error;
   }
 };
@@ -92,7 +101,34 @@ export const getImageStocks = (params: any) => genericGet('/image-stocks.do', pa
 export const getImageFullStocks = (params: any) => genericGet('/image-full-stocks.do', params);
 
 // --- Catalogue Web ---
-export const getCatalogueWeb = (params: any) => genericGet('/catalogue-web.do', params);
+// Filtrage par magasin : si OOPOS_MAGASIN est défini dans .env, il est
+// automatiquement passé à catalogue-web.do pour reproduire exactement
+// le même filtrage que l'interface caisse OOPOS.
+export const getCatalogueWeb = async (params: any) => {
+  const finalParams = { ...params };
+  if (OOPOS_MAGASIN) {
+    finalParams['Magasin'] = OOPOS_MAGASIN;
+  }
+  console.log(`[getCatalogueWeb] params:`, JSON.stringify(finalParams));
+  const data = await genericGet('/catalogue-web.do', finalParams);
+  return data;
+};
+
+/**
+ * Récupère la liste de tous les magasins distincts présents dans
+ * le catalogue OOPOS. Utile pour diagnostiquer quel nom de magasin
+ * utiliser dans OOPOS_MAGASIN.
+ */
+export const getMagasinsDisponibles = async (): Promise<string[]> => {
+  const data = await genericGet('/catalogue-web.do', { 'output-format': 'json' });
+  const products = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+  const magasins = new Set<string>();
+  for (const p of products) {
+    const m = p.Magasin || p.magasin;
+    if (m) magasins.add(m);
+  }
+  return Array.from(magasins).sort();
+};
 
 // --- Utilitaires ---
 export const eanExiste = (params: any) => genericGet('/ean-existe.do', params);

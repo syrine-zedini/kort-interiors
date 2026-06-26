@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import api from "@/libs/axios";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -17,7 +16,6 @@ interface SuccessMessage {
 }
 
 export default function AuthModal({ open, onClose }: AuthModalProps) {
-  const router = useRouter();
   const { login } = useAuth();
   const [tab, setTab] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -56,6 +54,18 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
     }
   }, [open]);
 
+  /* Reset form when modal closes */
+  useEffect(() => {
+    if (!open) {
+      setEmail("");
+      setPassword("");
+      setName("");
+      setError("");
+      setEmailError("");
+      setSuccess(null);
+    }
+  }, [open]);
+
   if (!open) return null;
 
   // Validation functions
@@ -80,7 +90,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
 
     try {
       if (tab === "register") {
-        // Validation for registration
         if (!validateName(name)) {
           setError("Le nom doit contenir au moins 2 caractères");
           return;
@@ -94,7 +103,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           return;
         }
 
-        // Sign up
         setIsLoading(true);
         const response = await api.post("/auth/signup", {
           username: name.trim(),
@@ -102,14 +110,12 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           password,
         });
 
-        // Show success message
         setSuccess({
           title: "Compte créé avec succès !",
           message: "Veuillez vérifier votre e-mail pour valider votre compte.",
           duration: 3000,
         });
 
-        // Reset form after showing success
         setTimeout(() => {
           setName("");
           setEmail("");
@@ -119,8 +125,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           onClose();
         }, 3000);
       } else {
-        // Login logic
-        // Validation for login
         if (!validateEmail(email)) {
           setEmailError("Veuillez entrer une adresse e-mail valide");
           return;
@@ -130,14 +134,12 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           return;
         }
 
-        // Sign in
         setIsLoading(true);
         const response = await api.post("/auth/login", {
           email: email.toLowerCase(),
           password,
         });
 
-        // Use auth context to store token and user
         if (response.data.token && response.data.user) {
           login(response.data.token, response.data.user);
         } else {
@@ -145,14 +147,12 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           throw new Error("No token received from server");
         }
 
-        // Show success message
         setSuccess({
           title: "Connecté avec succès !",
           message: `Bienvenue ${response.data.user.username || "!"}`,
           duration: 2000,
         });
 
-        // Reset form and close modal after showing success
         setTimeout(() => {
           setEmail("");
           setPassword("");
@@ -255,7 +255,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: "auto", padding: "40px" }}>
+        <form onSubmit={handleSubmit} autoComplete="off" style={{ flex: 1, overflowY: "auto", padding: "40px" }}>
           {/* Error message */}
           {error && (
             <div style={{
@@ -289,6 +289,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 placeholder="Marie Dupont"
                 required
                 disabled={isLoading}
+                autoComplete="off"
                 style={inputStyle}
                 className="auth-input"
               />
@@ -307,6 +308,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
               placeholder="marie@example.com"
               required
               disabled={isLoading}
+              autoComplete="off"
               style={inputStyle}
               className="auth-input"
             />
@@ -326,6 +328,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
               placeholder="••••••••"
               required
               disabled={isLoading}
+              autoComplete="new-password"
               style={inputStyle}
               className="auth-input"
             />

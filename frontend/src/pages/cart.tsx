@@ -35,6 +35,16 @@ export default function CartPage() {
   const [isSavingPhone, setIsSavingPhone] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [showToast, setShowToast] = useState(false);
+
+  const showToastMsg = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 4000);
+  };
 
   // Fetch cart when component mounts or auth state changes
   // Note: Unauthenticated users can view their cart, but must authenticate to checkout
@@ -107,15 +117,16 @@ export default function CartPage() {
           router.push("/cart/payment-success");
         } else {
           // For on_delivery payments, show success message and redirect to home
-          alert("Votre commande a été passée avec succès !");
-          router.push("/");
+          showToastMsg("Votre commande a été passée avec succès !", "success");
+          setTimeout(() => router.push("/"), 2000);
         }
       }
     } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || "Veuillez réessayer.";
       if (paymentMethod === "online") {
         router.push("/cart/payment-failed?reason=declined");
       } else {
-        alert("Erreur lors de la commande: " + (err?.message || "Veuillez réessayer."));
+        showToastMsg("Erreur : " + errMsg, "error");
         console.error(err);
       }
     } finally {
@@ -995,6 +1006,42 @@ export default function CartPage() {
                 {isSavingPhone ? "Enregistrement..." : "Enregistrer et commander"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {showToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: 32,
+          right: 32,
+          background: toastType === 'error' ? '#ef4444' : '#fff',
+          color: toastType === 'error' ? '#fff' : '#1a1a1a',
+          padding: '16px 20px',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+          borderLeft: toastType === 'error' ? 'none' : '3px solid #1a1a1a',
+          minWidth: 280,
+          maxWidth: 400,
+        }}>
+          {toastType === 'success' && (
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          )}
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>
+              {toastType === 'error' ? 'Erreur' : 'Succès'}
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: toastType === 'error' ? 'rgba(255,255,255,0.85)' : '#666' }}>
+              {toastMessage}
+            </p>
           </div>
         </div>
       )}

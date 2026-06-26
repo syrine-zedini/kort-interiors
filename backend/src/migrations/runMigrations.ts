@@ -239,6 +239,26 @@ export const runMigrations = async (sequelize: Sequelize) => {
   } catch (err) {
     console.log("Could not alter styles/style column type (might already be correct):", err);
   }
+
+  // Allow OOPOS product codes (e.g. "oopos-1093") in cart: change productId from uuid to text
+  try {
+    await sequelize.query(`ALTER TABLE "cart_items" DROP CONSTRAINT IF EXISTS "cart_items_productId_fkey"`);
+    await sequelize.query(`DROP INDEX IF EXISTS "unique_user_product_variant_material_cart"`);
+    await sequelize.query(`ALTER TABLE "cart_items" ALTER COLUMN "productId" TYPE TEXT USING "productId"::text`);
+    await sequelize.query(`CREATE UNIQUE INDEX IF NOT EXISTS "unique_user_product_variant_material_cart" ON "cart_items" ("userId", "productId", "selectedSize", "selectedColor", "selectedmaterial")`);
+    console.log('✅ cart_items.productId migrated to TEXT (supports OOPOS codes)');
+  } catch (err: any) {
+    console.log('cart_items.productId migration note:', err.message);
+  }
+
+  // Allow OOPOS product codes in commande_items: change productId from uuid to text
+  try {
+    await sequelize.query(`ALTER TABLE "commande_items" DROP CONSTRAINT IF EXISTS "commande_items_productId_fkey"`);
+    await sequelize.query(`ALTER TABLE "commande_items" ALTER COLUMN "productId" TYPE TEXT USING "productId"::text`);
+    console.log('✅ commande_items.productId migrated to TEXT (supports OOPOS codes)');
+  } catch (err: any) {
+    console.log('commande_items.productId migration note:', err.message);
+  }
 };
 
 if (require.main === module) {

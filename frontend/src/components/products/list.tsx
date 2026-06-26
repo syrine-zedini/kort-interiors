@@ -443,7 +443,13 @@ export default function List({ loading, data, categorySlug }: Props) {
                       justifyContent: "center",
                     }}>
                       <img
-                        src={cardItem.images?.[0] ? (cardItem.images[0].startsWith("http") ? cardItem.images[0] : `${process.env.NEXT_PUBLIC_IMAGE_URL}${cardItem.images[0]}`) : "/placeholder.png"}
+                        src={(() => {
+                          const img = cardItem.images?.[0];
+                          if (!img || img === "/placeholder.png") return "/assets/imgs/products/article_1.jpg";
+                          if (img.startsWith("http")) return img;
+                          if (img.startsWith("/assets/")) return img;
+                          return `${process.env.NEXT_PUBLIC_IMAGE_URL}${img}`;
+                        })()}
                         alt={cardItem.name}
                         style={{ width: "100%", height: "100%", objectFit: "contain" }}
                       />

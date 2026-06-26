@@ -106,11 +106,11 @@ router.get('/', auth, async (req: Request, res: Response) => {
   try {
     const cartItems = await getUserCart(req.user!.id);
     
-    // Ensure color names are included by fetching colors if not present
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const colorIds = [...new Set(cartItems
-      .filter((item: any) => item.selectedColor && !item.colorName)
+      .filter((item: any) => item.selectedColor && !item.colorName && UUID_RE.test(item.selectedColor))
       .map((item: any) => item.selectedColor))] as string[];
-    
+
     let colorMap = new Map();
     if (colorIds.length > 0) {
       const colors = await Color.findAll({

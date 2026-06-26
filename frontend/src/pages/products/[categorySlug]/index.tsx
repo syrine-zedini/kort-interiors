@@ -11,6 +11,7 @@ export default function CategoryBySlugPage() {
 
   const [loading, setLoading] = useState(true);
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (!categorySlug || Array.isArray(categorySlug)) return;
@@ -47,7 +48,7 @@ export default function CategoryBySlugPage() {
 
   return (
     <ClientSideLayout isNavbarOn={true}>
-      <Products categoryId={categoryId} />
+      <Products categoryId={categoryId} showAll={showAll} onShowAllChange={setShowAll} />
     </ClientSideLayout>
   );
 }

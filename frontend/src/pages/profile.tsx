@@ -11,6 +11,31 @@ export default function ProfileView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Decode role from JWT token stored in localStorage
+  const getRoleFromToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        window
+          .atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload).role || null;
+    } catch (e) {
+      console.error('Failed to parse token:', e);
+      return null;
+    }
+  };
+
+  const userRole = getRoleFromToken() || authContext.user?.role || profile?.role;
+  const isAdmin = userRole === 'SuperAdmin' || userRole === 'Admin';
+
   useEffect(() => {
     if (authContext.isLoading) {
       return;
@@ -338,6 +363,52 @@ export default function ProfileView() {
             >
               Retour a l'accueil
             </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  let adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL;
+                  if (!adminUrl) {
+                    const hostname = window.location.hostname;
+                    const protocol = window.location.protocol;
+                    
+                    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                      adminUrl = 'http://localhost:3000';
+                    } else {
+                      const port = window.location.port;
+                      if (port) {
+                        // Si accès par port en production/staging, on bascule sur le port admin 3000
+                        adminUrl = `${protocol}//${hostname}:3000`;
+                      } else {
+                        // Sinon, format sous-domaine standard (ex: admin.votresite.com)
+                        adminUrl = `${protocol}//admin.${hostname.replace('www.', '')}`;
+                      }
+                    }
+                  }
+                  window.location.href = adminUrl;
+                }}
+                style={{
+                  padding: '13px 24px',
+                  background: '#d4af37',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: 1.4,
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#c19a28';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#d4af37';
+                }}
+              >
+                Voir dashboard
+              </button>
+            )}
           </div>
         </div>
         </div>

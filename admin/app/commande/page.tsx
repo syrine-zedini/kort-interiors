@@ -132,10 +132,18 @@ export default function CommandesPage() {
     try {
       const res = await fetchTicketPdf(entete);
       setOoposActionResult({ action: "ticket-pdf", entete, response: res });
-      if (res?.url) {
-         window.open(res.url, "_blank");
+      if (res?.pdf_content) {
+        const binary = atob(res.pdf_content);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        toast.success("PDF ouvert");
+      } else if (res?.url) {
+        window.open(res.url, "_blank");
       } else {
-         toast.success("Demande envoyée");
+        toast.info("Réponse reçue mais aucun PDF disponible");
       }
     } catch (e: any) {
       setOoposActionError(e);
@@ -258,13 +266,22 @@ export default function CommandesPage() {
       </div>
 
       {useOopos && (ooposActionResult || ooposActionError || ooposActionLoading) && (
-        <ApiResultPanel
-          title="Résultat action OOPOS tickets"
-          description="Réponse réelle retournée par Joolan après PDF ticket ou annulation."
-          data={ooposActionResult}
-          error={ooposActionError}
-          loading={ooposActionLoading}
-        />
+        <div className="relative">
+          <button
+            onClick={() => { setOoposActionResult(null); setOoposActionError(null); }}
+            className="absolute top-3 right-3 z-10 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+            title="Fermer"
+          >
+            <X size={15} />
+          </button>
+          <ApiResultPanel
+            title="Résultat action OOPOS tickets"
+            description="Réponse réelle retournée par Joolan après PDF ticket ou annulation."
+            data={ooposActionResult}
+            error={ooposActionError}
+            loading={ooposActionLoading}
+          />
+        </div>
       )}
 
       {/* Table */}
@@ -300,15 +317,19 @@ export default function CommandesPage() {
                         <p className="text-xs text-gray-500">Caisse {ticket.Caisse}</p>
                      </div>
                      <div>
-                        {ticket.Lignes?.map((l, i: number) => (
+                        {ticket.Lignes && ticket.Lignes.length > 0 ? ticket.Lignes.map((l, i: number) => (
                            <div key={i} className="text-sm text-gray-700">
                               <span className="font-medium">{l.Quantite}x</span> {l.Designation} <span className="text-gray-400">({l.Prix_Vente} DT)</span>
                            </div>
-                        ))}
+                        )) : (
+                           <span className="text-xs text-gray-400 italic">Non disponible</span>
+                        )}
                      </div>
-                     <div className="text-sm font-medium text-gray-700">{ticket.Vendeur}</div>
+                     <div className="text-sm font-medium text-gray-700">{ticket.Vendeur || "—"}</div>
                      <div className="text-sm font-bold text-gray-900">
-                        {ticket.Reglements?.reduce((acc: number, r) => acc + (r.Montant || 0), 0).toFixed(2)} DT
+                        {ticket.Reglements && ticket.Reglements.length > 0
+                           ? ticket.Reglements.reduce((acc: number, r) => acc + (r.Montant || 0), 0).toFixed(2) + " DT"
+                           : "—"}
                      </div>
                      <div className="flex gap-2">
                         <button onClick={() => handleDownloadPdf(String(ticket.Entete || "1"))} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="PDF">

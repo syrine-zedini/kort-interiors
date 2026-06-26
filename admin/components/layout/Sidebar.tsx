@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, Tag, Image, Palette, FileText, Percent, Users, ShoppingCart, PackageOpen, Layers, Wrench } from "lucide-react";
+import { LayoutDashboard, Package, Tag, Image, Palette, FileText, Percent, Users, ShoppingCart, PackageOpen, Layers, Wrench, ArrowLeft } from "lucide-react";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,6 +21,25 @@ const links = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+
+  const handleBackToProfile = () => {
+    let frontendUrl = process.env.NEXT_PUBLIC_FRONTEND_URL;
+    if (!frontendUrl) {
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      if (hostname === "localhost" || hostname === "127.0.0.1") {
+        frontendUrl = "http://localhost:3005";
+      } else {
+        const port = window.location.port;
+        if (port) {
+          frontendUrl = `${protocol}//${hostname}:3005`;
+        } else {
+          frontendUrl = `${protocol}//${hostname.replace("admin.", "www.")}`;
+        }
+      }
+    }
+    window.location.href = `${frontendUrl}/profile`;
+  };
 
   return (
     <aside className="w-60 min-h-screen bg-white border-r border-gray-200 flex flex-col">
@@ -52,7 +71,18 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-200 text-xs text-gray-400">
+      {/* Bouton Retour au Profil */}
+      <div className="p-4 border-t border-gray-200">
+        <button
+          onClick={handleBackToProfile}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Retour au profil
+        </button>
+      </div>
+
+      <div className="px-4 pb-4 text-xs text-gray-400">
         Kort Interiors © {new Date().getFullYear()}
       </div>
     </aside>

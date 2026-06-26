@@ -15,7 +15,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect }) =
 
     let displayImage = variant?.images?.[0] || product.images?.[0] || "";
     if (displayImage && displayImage !== "/placeholder.png") {
-        displayImage = `${process.env.NEXT_PUBLIC_IMAGE_URL}${displayImage}`;
+        if (!displayImage.startsWith("/assets/") && !displayImage.startsWith("http")) {
+            displayImage = `${process.env.NEXT_PUBLIC_IMAGE_URL}${displayImage}`;
+        }
     }
 
     const priceCandidates: number[] = [];

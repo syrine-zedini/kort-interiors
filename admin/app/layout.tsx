@@ -4,6 +4,8 @@ import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
 import Sidebar from "@/components/layout/Sidebar";
 import { Toaster } from "sonner";
+import { AuthProvider } from "@/contexts/AuthContext";
+import AppLayout from "@/components/layout/AppLayout";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -15,9 +17,6 @@ export const metadata: Metadata = {
   title: "Kort Interiors — Admin",
   description: "Administration panel",
 };
-
-import { AuthProvider } from "@/contexts/AuthContext";
-import AppLayout from "@/components/layout/AppLayout";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

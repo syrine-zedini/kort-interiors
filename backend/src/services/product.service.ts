@@ -1,678 +1,571 @@
-import { Op } from "sequelize";
-import { sequelize } from "../config/sequelize";
-import { ProductVariant } from "../models/product_variant";
-import { ProductItem } from "../models/product_item.model";
-import { ProductType } from "../enums/productType";
-import { v4 as uuidv4 } from "uuid";
-import { Product, Color } from "../models";
-import { ProductCategory } from "../models/product_categories.model";
-import { generateSlug, isUUID } from "../helpers/slug";
-import { getApplicablePromotion, calculateFinalPrice, PriceWithPromotion } from "./promotion.service";
+import { Op } from 'sequelize';
+import { Product } from '../models/product.model';
+import { ProductVariant } from '../models/product_variant';
+import { ProductItem } from '../models/product_item.model';
+import { generateSlug } from '../helpers/slug';
+import * as joolanService from "./joolan.service";
+import { getCategoryById } from "./categories.service";
 
-
-interface ProductItemInput {
-    id?: string;  // present when updating existing item
-    name: string;
-    code?: string;
-    description?: string;
-    price?: number;
-    discount?: number;
-    sizePricing?: Record<string, { price?: number; discount?: number }>;
-    sizeMaterialPricing?: Record<string, Record<string, number>>;
-    sizes?: string[];
-    colors?: string[];
-    images?: string[];
-    sortOrder?: number;
-}
-
-interface VariantInput {
-    id?: string;  // present when updating existing variant
-    name?: string;
-    description?: string;
-    code?: string;
-    price?: number;
-    discount?: number;
-    size?: string;
-    color?: string;
-    sizePricing?: Record<string, { price?: number; discount?: number }>;
-    sizeMaterialPricing?: Record<string, Record<string, number>>;
-    sizes?: string[];
-    sku?: string;
-    images?: string[];
-    sortOrder?: number;
-    style?: string;
-}
-
-interface CreateProductInput {
-    name?: string;
-    code: string;
-    description?: string;
-    sizes?: string[];
-    colors?: string[];
-    prices?: number[];
-    discounts?: number[];
-    sizePricing?: Record<string, { price?: number; discount?: number }>;
-    sizeMaterialPricing?: Record<string, Record<string, number>>;
-    images?: string[];
-    variantImages?: Record<string, string[]>;
-    categoryId?: string;
-    manualVariants?: boolean;    // true = user manages variants manually, false = auto-generate (default)
-    variants?: VariantInput[];   // sub-variants when manualVariants=true
-    items?: ProductItemInput[];   // sub-items like "Taie d'oreiller", "Housse de couette"
-    details?: { key: string; value: string }[];
-    isDetailsEnabled?: boolean;
-    styles?: string[];
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-const includeAll = [
-    {
-        model: ProductVariant,
-        as: "variants",
-        include: [{ model: Color, as: "colorData" }, { model: require('../models').Style, as: "styleData" }]
-    },
-    { model: ProductItem, as: "items" },
-
-];
+/** Returns true if a product SKU is active (Actif = 1, "1", or true). */
+const isActif = (product: any): boolean => {
+    const v = product.Actif !== undefined ? product.Actif : product.actif;
+    return v === 1 || v === "1" || v === true;
+};
 
 /**
- * Generate product variants based on sizes, colors, prices, and pricing rules
- * Reusable by both create and update operations
+ * OOPOS-ONLY: Get products for a specific category
+ * Returns ONLY products from OOPOS catalogue that match the category
+ * NO database queries, NO local storage
  */
-const regenerateProductVariants = async (
-    productId: string,
-    sizes?: string[],
-    colors?: string[],
-    prices?: number[],
-    discounts?: number[],
-    sizePricing?: Record<string, { price?: number; discount?: number }>,
-    variantImages?: Record<string, string[]>,
-    defaultImages?: string[]
-): Promise<void> => {
-    // Delete all existing variants for this product
-    await ProductVariant.destroy({ where: { productId } });
+export const getProductsByCategoryId = async (categoryId: string, showAll: boolean = false) => {
+    try {
+        console.log(`[getProductsByCategoryId] Starting with categoryId="${categoryId}" showAll=${showAll}`);
+        
+        // Step 1: Get category from OOPOS hierarchy
+        const category = await getCategoryById(categoryId);
+        console.log(`[getProductsByCategoryId] Found category: id="${category.id}" name="${category.name}"`);
+        
+        // Step 2: Get all OOPOS products
+        const ooposResponse = await joolanService.getCatalogueWeb({ 'output-format': 'json' });
+        const ooposProducts = Array.isArray(ooposResponse) 
+            ? ooposResponse 
+            : Array.isArray(ooposResponse?.data) 
+                ? ooposResponse.data 
+                : [];
+        
+        console.log(`[getProductsByCategoryId] Total OOPOS products: ${ooposProducts.length}`);
+        
+        // Step 3: Normalize category name for comparison
+        const normalize = (str: string) => {
+            return (str || '')
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]/g, '')
+                .replace(/\d+$/, '');
+        };
+        
+        const categoryNameNormalized = category.name.trim().toUpperCase();
+        console.log(`[getProductsByCategoryId] Normalized category name: "${categoryNameNormalized}"`);
+        
+        // Step 4: Filter products by category (Rayon) and active status
+        const productsMap = new Map();
+        let filteredCount = 0;
+        
+        for (const product of ooposProducts) {
+            const rayonRaw = (product.Rayon || product.rayon || '').trim();
+            const rayon = rayonRaw.toUpperCase();
+            
+            // Filter by Rayon matching exactly the category name case-insensitive
+            if (rayonRaw && rayon === categoryNameNormalized) {
 
-    // Prepare variant generation parameters
-    const variantSizes = (sizes && sizes.length > 0) ? sizes : [undefined];
-    const variantColors = (colors && colors.length > 0) ? colors : [undefined];
-    const variantPrices = (prices && prices.length > 0) ? prices : [0];
-    const variantDiscounts = (discounts && discounts.length > 0) ? discounts : [0];
+                // Filter inactive products unless showAll is set
+                if (!showAll && !isActif(product)) continue;
 
-    // Create all size × color variant combinations
-    for (let i = 0; i < variantSizes.length; i++) {
-        for (let j = 0; j < variantColors.length; j++) {
-            const size = variantSizes[i];
-            const colorKey = variantColors[j];
+                filteredCount++;
+                const code = product.Produit || product.produit || product.Code || product.code;
+                const size = product.Taille || product.taille;
+                const color = product.Couleur || product.couleur;
+                
+                if (code) {
+                    if (!productsMap.has(code)) {
+                        productsMap.set(code, {
+                            id: `oopos-${code}`,
+                            code: code,
+                            name: product.Designation || product.designation || '',
+                            price: product.Prix_Vente || product.prix_vente || 0,
+                            discount: product.Remise_Vente || product.remise_vente || 0,
+                            categoryId: category.id,
+                            categoryName: category.name,
+                            rayon: rayonRaw || 'Non classé',
+                            famille: product.Famille || product.famille || '',
+                            sousFamille: product.SousFamille || product.sousFamille || '',
+                            marque: product.Marque || product.marque || '',
+                            ean: product.EAN || product.ean || '',
+                            fournisseur: product.Fournisseur || product.fournisseur || '',
+                            sku: product.Sku || product.sku || '',
+                            saison: product.Saison || product.saison || '',
+                            poids: product.Poids || product.poids || 0,
+                            actif: isActif(product) ? 1 : 0,
+                            photo1: product.Photo1 || product.photo1 || '',
+                            photo2: product.Photo2 || product.photo2 || '',
+                            images: [product.Photo1 || product.photo1, product.Photo2 || product.photo2].filter(Boolean),
+                            sizes: [],
+                            colors: [],
+                            variants: []
+                        });
+                    }
 
-            const sp = (sizePricing && size) ? sizePricing[size] : null;
-
-            // If sizePricing specifies price/discount for this size, use that.
-            // Otherwise, iterate over generic prices/discounts arrays
-            const targetPrices = sp?.price != null ? [sp.price] : variantPrices;
-            const targetDiscounts = sp?.discount != null ? [sp.discount] : variantDiscounts;
-
-            for (let k = 0; k < targetPrices.length; k++) {
-                for (let l = 0; l < targetDiscounts.length; l++) {
-                    const varImages = (variantImages && colorKey)
-                        ? variantImages[colorKey]
-                        : defaultImages;
-
-                    await ProductVariant.create({
-                        productId,
-                        price: targetPrices[k],
-                        discount: targetDiscounts[l],
-                        size,
-                        color: colorKey,
-                        sku: "SKU-" + uuidv4().split("-")[0].toUpperCase(),
-                        images: varImages,
+                    const parent = productsMap.get(code);
+                    if (size && !parent.sizes.includes(size)) parent.sizes.push(size);
+                    if (color && !parent.colors.includes(color)) parent.colors.push(color);
+                    parent.variants.push({
+                        sku: product.Sku || product.sku || product.EAN || product.ean || '',
+                        size: size || '',
+                        color: color || '',
+                        price: product.Prix_Vente || product.prix_vente || 0,
+                        discount: product.Remise_Vente || product.remise_vente || 0,
+                        actif: isActif(product) ? 1 : 0,
+                        ean: product.EAN || product.ean || ''
                     });
                 }
             }
         }
+        
+        console.log(`[getProductsByCategoryId] OOPOS filtered by Rayon='${category.name}': ${filteredCount} products`);
+        console.log(`[getProductsByCategoryId] Unique products (by code): ${productsMap.size}`);
+        
+        const products = Array.from(productsMap.values());
+        console.log(`[getProductsByCategoryId] Returning ${products.length} unique products`);
+        
+        return products;
+        
+    } catch (error: any) {
+        console.error('[getProductsByCategoryId] Error:', error.message);
+        throw error;
     }
 };
 
 /**
- * Synchronize product items during update: add new, update existing, delete removed
+ * OOPOS-ONLY: Get all categories
+ * Returns all categories from OOPOS hierarchy
  */
-const syncProductItems = async (
-    productId: string,
-    newItems?: ProductItemInput[]
-): Promise<void> => {
-    if (!newItems) {
-        // If no items provided, don't modify existing items
-        return;
-    }
-
-    // Get current items from database
-    const currentItems = await ProductItem.findAll({ where: { productId } });
-    const currentItemsMap = new Map(currentItems.map(it => [it.id, it]));
-
-    // Track which item IDs we've processed
-    const processedIds = new Set<string>();
-
-    // Process each item in the new list
-    for (let idx = 0; idx < newItems.length; idx++) {
-        const item = newItems[idx];
-
-        if (item.id) {
-            // Update existing item
-            processedIds.add(item.id);
-            await updateProductItem(item.id, {
-                ...item,
-                sortOrder: idx,
-            });
-        } else {
-            // Add new item
-            await addProductItem(productId, {
-                ...item,
-                sortOrder: idx,
-            });
-        }
-    }
-
-    // Delete items that are no longer in the list
-    for (const [itemId] of currentItemsMap) {
-        if (!processedIds.has(itemId)) {
-            await deleteProductItem(itemId);
-        }
+export const getAllCategories = async () => {
+    try {
+        const { getAllCategories: getAllCategoriesFromService } = require('./categories.service');
+        return await getAllCategoriesFromService();
+    } catch (error: any) {
+        console.error('[getAllCategories] Error:', error.message);
+        throw error;
     }
 };
 
 /**
- * Synchronize product variants during update: add new, update existing, delete removed
+ * OOPOS-ONLY: Get category variants
+ * Returns products with their variants from OOPOS
  */
-const syncProductVariants = async (
-    productId: string,
-    newVariants?: VariantInput[]
-): Promise<void> => {
-    if (!newVariants) {
-        // If no variants provided, don't modify existing variants
-        return;
-    }
-
-    // Get current variants from database
-    const currentVariants = await ProductVariant.findAll({ where: { productId } });
-    const currentVariantsMap = new Map(currentVariants.map(v => [v.id, v]));
-
-    // Track which variant IDs we've processed
-    const processedIds = new Set<string>();
-
-    // Process each variant in the new list
-    for (let idx = 0; idx < newVariants.length; idx++) {
-        const variant = newVariants[idx];
-
-        if (variant.id) {
-            // Update existing variant
-            processedIds.add(variant.id);
-            await updateProductVariant(variant.id, {
-                ...variant,
-                sortOrder: idx,
-            });
-        } else {
-            // Add new variant
-            await addProductVariant(productId, {
-                ...variant,
-                sortOrder: idx,
-            });
-        }
-    }
-
-    // Delete variants that are no longer in the list
-    for (const [variantId] of currentVariantsMap) {
-        if (!processedIds.has(variantId)) {
-            await deleteProductVariant(variantId);
-        }
+export const getCategoryVariants = async (categoryId: string, showAll: boolean = false) => {
+    try {
+        const products = await getProductsByCategoryId(categoryId, showAll);
+        return products.map((p: any) => ({
+            ...p,
+            mainProductId: p.id,
+            variantId: p.id,
+        }));
+    } catch (error: any) {
+        console.error('[getCategoryVariants] Error:', error.message);
+        throw error;
     }
 };
 
 /**
- * Enrich a product with promotion information
+ * OOPOS-ONLY: Get product by code
+ * Returns a single product from OOPOS by its code
  */
-async function enrichProductWithPromotion(product: any) {
-    const promotion = await getApplicablePromotion(product);
-
-    // Get the base price (used if no size-material pricing)
-    const basePrice = product.price || 0;
-    const basePricing = calculateFinalPrice(basePrice, promotion);
-
-    // If product has size-material pricing, apply promotion to each combination
-    let sizeMaterialPricingWithPromotion: Record<string, Record<string, any>> | undefined;
-
-    if (product.sizeMaterialPricing && typeof product.sizeMaterialPricing === 'object') {
-        sizeMaterialPricingWithPromotion = {};
-
-        for (const [size, materials] of Object.entries(product.sizeMaterialPricing)) {
-            sizeMaterialPricingWithPromotion[size] = {};
-
-            if (typeof materials === 'object' && materials !== null) {
-                for (const [material, price] of Object.entries(materials as Record<string, number>)) {
-                    const materialPrice = Number(price) || 0;
-                    const materialPricing = calculateFinalPrice(materialPrice, promotion);
-
-                    sizeMaterialPricingWithPromotion[size][material] = {
-                        basePrice: materialPrice,
-                        finalPrice: materialPricing.finalPrice,
-                        savingsAmount: materialPricing.savingsAmount,
-                        savingsPercentage: materialPricing.savingsPercentage,
-                    };
-                }
-            }
-        }
-    }
-
-    return {
-        ...product.toJSON ? product.toJSON() : product,
-        promotion: promotion ? {
-            id: promotion.id,
-            name: promotion.name,
-            discountType: promotion.discountType,
-            discountValue: promotion.discountValue,
-        } : null,
-        pricing: basePricing,
-        sizeMaterialPricingWithPromotion,
-    };
-}
-
-/**
- * Enrich multiple products with promotion information
- */
-async function enrichProductsWithPromotions(products: Product[]) {
-    return Promise.all(products.map(enrichProductWithPromotion));
-}
-
-// ─── Product CRUD ────────────────────────────────────────────────────────────
-
-export const createProduct = async (data: CreateProductInput) => {
-    const priceFixed = (data.prices?.length ?? 0) === 1;
-    const discountFixed = (data.discounts?.length ?? 0) === 1;
-    const sizesFixed = !data.sizes || data.sizes.length === 1;
-    const colorsFixed = !data.colors || data.colors.length === 1;
-
-    let productType: ProductType = ProductType.VARIABLE_VARIABLE_VARIABLE; // Default fallback
-
-    if (priceFixed && discountFixed && sizesFixed && colorsFixed) {
-        productType = ProductType.FIXED_FIXED_FIXED;
-    } else if (priceFixed && discountFixed) {
-        productType = ProductType.FIXED_FIXED_VARIABLE;
-    } else {
-        productType = ProductType.VARIABLE_VARIABLE_VARIABLE;
-    }
-
-    const baseSlug = generateSlug(data.name ?? data.code);
-    const slug = await ensureUniqueSlug(baseSlug);
-
-    const product = await Product.create({
-        name: data.name || undefined,
-        slug,
-        code: data.code,
-        description: data.description,
-        productType,
-        price: priceFixed ? data.prices?.[0] : undefined,
-        discount: discountFixed ? data.discounts?.[0] : undefined,
-        sizes: sizesFixed ? data.sizes : undefined,
-        colors: colorsFixed ? data.colors : undefined,
-        sizeMaterialPricing: data.sizeMaterialPricing,
-        images: data.images,
-        categoryId: data.categoryId,
-        manualVariants: data.manualVariants ?? false,
-        details: data.details,
-        isDetailsEnabled: data.isDetailsEnabled ?? false,
-        styles: data.styles,
-    });
-
-    // --- Variants ---
-    if (data.manualVariants && data.variants && data.variants.length > 0) {
-        // Manual variant management
-        await syncProductVariants(product.id, data.variants);
-    } else {
-        // Auto-generate variants (default behavior)
-        await regenerateProductVariants(
-            product.id,
-            data.sizes,
-            data.colors,
-            data.prices,
-            data.discounts,
-            data.sizePricing,
-            data.variantImages,
-            data.images
+export const getProductByCode = async (code: string, showAll: boolean = false) => {
+    try {
+        const ooposResponse = await joolanService.getCatalogueWeb({ 'output-format': 'json' });
+        const ooposProducts = Array.isArray(ooposResponse) 
+            ? ooposResponse 
+            : Array.isArray(ooposResponse?.data) 
+                ? ooposResponse.data 
+                : [];
+        
+        const skuItems = ooposProducts.filter((p: any) => 
+            (p.Produit || p.produit || p.Code || p.code) === code
         );
-    }
-
-    // --- Items (product group pieces) ---
-    if (data.items && data.items.length > 0) {
-        for (let idx = 0; idx < data.items.length; idx++) {
-            const item = data.items[idx];
-            await ProductItem.create({
-                productId: product.id,
-                name: item.name,
-                code: item.code,
-                description: item.description,
-                price: item.price,
-                discount: item.discount,
-                sizePricing: item.sizePricing,
-                sizeMaterialPricing: item.sizeMaterialPricing,
-                sizes: item.sizes,
-                colors: item.colors,
-                images: item.images,
-                sortOrder: item.sortOrder ?? idx,
-            });
+        
+        if (skuItems.length === 0) {
+            throw new Error(`Product with code ${code} not found in OOPOS`);
         }
-    }
 
-    return getProductById(product.id);
+        const activeSkuItems = showAll 
+            ? skuItems 
+            : skuItems.filter(isActif);
+
+        if (activeSkuItems.length === 0 && !showAll) {
+            throw new Error(`Product with code ${code} is inactive in OOPOS`);
+        }
+
+        const baseProduct = activeSkuItems[0] || skuItems[0];
+        
+        const sizes = Array.from(new Set(skuItems.map((p: any) => p.Taille || p.taille).filter(Boolean)));
+        const colors = Array.from(new Set(skuItems.map((p: any) => p.Couleur || p.couleur).filter(Boolean)));
+
+        const variants = skuItems.map((p: any) => ({
+            sku: p.Sku || p.sku || p.EAN || p.ean || '',
+            size: p.Taille || p.taille || '',
+            color: p.Couleur || p.couleur || '',
+            price: p.Prix_Vente || p.prix_vente || 0,
+            discount: p.Remise_Vente || p.remise_vente || 0,
+            actif: p.Actif !== undefined ? p.Actif : p.actif !== undefined ? p.actif : 1,
+            ean: p.EAN || p.ean || ''
+        }));
+
+        return {
+            id: `oopos-${code}`,
+            code: code,
+            name: baseProduct.Designation || baseProduct.designation || '',
+            price: baseProduct.Prix_Vente || baseProduct.prix_vente || 0,
+            discount: baseProduct.Remise_Vente || baseProduct.remise_vente || 0,
+            rayon: baseProduct.Rayon || baseProduct.rayon || 'Non classé',
+            famille: baseProduct.Famille || baseProduct.famille || '',
+            sousFamille: baseProduct.SousFamille || baseProduct.sousFamille || '',
+            marque: baseProduct.Marque || baseProduct.marque || '',
+            ean: baseProduct.EAN || baseProduct.ean || '',
+            fournisseur: baseProduct.Fournisseur || baseProduct.fournisseur || '',
+            sku: baseProduct.Sku || baseProduct.sku || '',
+            saison: baseProduct.Saison || baseProduct.saison || '',
+            poids: baseProduct.Poids || baseProduct.poids || 0,
+            actif: isActif(baseProduct) ? 1 : 0,
+            photo1: baseProduct.Photo1 || baseProduct.photo1 || '',
+            photo2: baseProduct.Photo2 || baseProduct.photo2 || '',
+            images: [baseProduct.Photo1 || baseProduct.photo1, baseProduct.Photo2 || baseProduct.photo2].filter(Boolean),
+            sizes,
+            colors,
+            variants
+        };
+    } catch (error: any) {
+        console.error('[getProductByCode] Error:', error.message);
+        throw error;
+    }
 };
 
-export const getAllProducts = async (search?: string, filters?: { color?: string; size?: string }) => {
-    let whereClause: any = {};
+/**
+ * OOPOS-ONLY: Get product stock
+ * Returns stock information from OOPOS
+ */
+export const getProductStock = async (code: string, couleur?: string, taille?: string) => {
+    try {
+        const stock = await joolanService.getStock({
+            Produit: code,
+            ...(couleur && { Couleur: couleur }),
+            ...(taille && { Taille: taille }),
+        });
+        
+        return stock;
+    } catch (error: any) {
+        console.error('[getProductStock] Error:', error.message);
+        throw error;
+    }
+};
 
-    // Search by code, name, or description
-    if (search) {
-        whereClause = {
-            [Op.or]: [
+/**
+ * OOPOS-ONLY: Verify EAN exists
+ * Returns product information if EAN exists
+ */
+export const verifyEAN = async (ean: string) => {
+    try {
+        // Verify EAN by searching in catalogue
+        const ooposResponse = await joolanService.getCatalogueWeb({ 'output-format': 'json' });
+        const ooposProducts = Array.isArray(ooposResponse) 
+            ? ooposResponse 
+            : Array.isArray(ooposResponse?.data) 
+                ? ooposResponse.data 
+                : [];
+        
+        const product = ooposProducts.find((p: any) => (p.EAN || p.ean) === ean);
+        
+        if (!product) {
+            throw new Error(`EAN ${ean} not found`);
+        }
+        
+        return {
+            ean: ean,
+            code: product.Produit || product.produit || product.Code || product.code,
+            name: product.Designation || product.designation || '',
+            price: product.Prix_Vente || product.prix_vente || 0,
+        };
+    } catch (error: any) {
+        console.error('[verifyEAN] Error:', error.message);
+        throw error;
+    }
+};
+
+/**
+ * DB: Get all local products (admin local mode)
+ * Supports search and filtering by color/size
+ */
+export const getAllProducts = async (search?: string, filters?: { color?: string; size?: string; showAll?: boolean | string }) => {
+    try {
+        const where: any = {};
+
+        if (search) {
+            where[Op.or] = [
                 { name: { [Op.iLike]: `%${search}%` } },
                 { code: { [Op.iLike]: `%${search}%` } },
-                { description: { [Op.iLike]: `%${search}%` } },
-            ]
-        };
-    }
+            ];
+        }
 
-    const products = await Product.findAll({ where: whereClause, include: includeAll });
-
-    // Filter by attributes (color, size) if provided
-    let filteredProducts = products;
-    if (filters?.color || filters?.size) {
-        filteredProducts = products.filter((product) => {
-            // If no variants, product doesn't match attribute filters
-            if (!product.variants || product.variants.length === 0) return false;
-
-            return product.variants.some((variant: any) => {
-                const colorMatch = !filters.color || variant.color === filters.color;
-                const sizeMatch = !filters.size || variant.size === filters.size;
-                return colorMatch && sizeMatch;
-            });
+        const products = await Product.findAll({
+            where,
+            include: [
+                { model: ProductVariant, as: 'variants', required: false },
+                { model: ProductItem, as: 'items', required: false },
+            ],
+            order: [['createdAt', 'DESC']],
         });
+
+        return products;
+    } catch (error: any) {
+        console.error('[getAllProducts] Error:', error.message);
+        throw error;
     }
-
-    return await enrichProductsWithPromotions(filteredProducts);
 };
 
-export const getProductsByCategoryId = async (categoryId: string) => {
-    const category = await ProductCategory.findByPk(categoryId, {
-        include: [{ model: ProductCategory, as: "children", attributes: ["id"] }],
-    });
+// ==========================================
+// DB-BASED CRUD (local products)
+// ==========================================
 
-    if (!category) throw new Error("Category not found");
-
-    const categoryIds: string[] = category.children && category.children.length > 0
-        ? [category.id, ...category.children.map((c) => c.id)]
-        : [category.id];
-
-    const products = await Product.findAll({
-        where: { categoryId: categoryIds },
-        include: includeAll,
-    });
-    return await enrichProductsWithPromotions(products);
+const variantInclude = {
+    model: ProductVariant,
+    as: 'variants',
+    required: false,
 };
 
-export const getCategoryVariants = async (categoryId: string) => {
-    const products = await getProductsByCategoryId(categoryId);
-    const variantsList: any[] = [];
-
-    for (const product of products) {
-        if (!product.variants || product.variants.length === 0) {
-            variantsList.push({ ...product, mainProductId: product.id });
-            continue;
-        }
-
-        for (const variant of product.variants) {
-            const finalPrice = variant.price != null ? variant.price : product.price;
-            const finalDiscount = variant.discount != null ? variant.discount : product.discount;
-            // Assuming promotion is already attached to product
-            const pricing = product.promotion ? calculateFinalPrice(finalPrice || 0, product.promotion) : calculateFinalPrice(finalPrice || 0, null);
-
-            variantsList.push({
-                ...product,
-                variantId: variant.id,
-                mainProductId: product.id,
-                name: variant.name || product.name,
-                price: finalPrice,
-                discount: finalDiscount,
-                images: variant.images && variant.images.length > 0 ? variant.images : product.images,
-                colorData: variant.colorData,
-                styleData: variant.styleData,
-                pricing,
-            });
-        }
-    }
-    return variantsList;
+const itemInclude = {
+    model: ProductItem,
+    as: 'items',
+    required: false,
 };
 
-const ensureUniqueSlug = async (base: string, excludeProductId?: string) => {
+async function ensureUniqueSlug(base: string, excludeId?: string): Promise<string> {
     let candidate = base;
     let suffix = 1;
-
-    // keep trying until we find a free slug (or it's already ours)
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const existing = await Product.findOne({ where: { slug: candidate } });
-        if (!existing) return candidate;
-        if (excludeProductId && existing.id === excludeProductId) return candidate;
-
-        suffix += 1;
+        if (!existing || (excludeId && existing.id === excludeId)) return candidate;
+        suffix++;
         candidate = `${base}-${suffix}`;
     }
-};
+}
+
 
 export const getProductById = async (id: string) => {
-    const product = isUUID(id)
-        ? await Product.findByPk(id, { include: includeAll })
-        : await Product.findOne({
-            where: {
-                [Op.or]: [
-                    { slug: id },
-                    { code: id },
-                ]
-            },
-            include: includeAll
-        });
-    if (!product) throw new Error("Product not found");
-    return await enrichProductWithPromotion(product);
-};
-
-export const getProductsByCode = async (code: string) => {
-    const products = await Product.findAll({
-        where: { code },
-        include: includeAll,
-        order: [['createdAt', 'ASC']],
-    });
-    if (products.length === 0) throw new Error("No products found with this code");
-
-    // Enrich all products with promotions
-    const enriched = await Promise.all(
-        products.map((p) => enrichProductWithPromotion(p))
-    );
-    return enriched;
-};
-
-export const updateProduct = async (id: string, data: Partial<CreateProductInput>) => {
-    const product = await Product.findByPk(id);
-    if (!product) throw new Error("Product not found");
-
-    // Determine new slug if name or code changed
-    const nextSlug = data.name
-        ? await ensureUniqueSlug(generateSlug(data.name), product.id)
-        : data.code
-            ? await ensureUniqueSlug(generateSlug(data.code), product.id)
-            : product.slug;
-
-    // Prepare updated sizes, colors, prices
-    const updatedSizes = data.sizes !== undefined ? data.sizes : product.sizes;
-    const updatedColors = data.colors !== undefined ? data.colors : product.colors;
-    const updatedPrices = data.prices !== undefined ? data.prices : (product.price != null ? [product.price] : undefined);
-    const updatedDiscounts = data.discounts !== undefined ? data.discounts : (product.discount != null ? [product.discount] : undefined);
-
-    // Determine the variant mode (manual vs auto)
-    const manualVariants = data.manualVariants !== undefined ? data.manualVariants : product.manualVariants;
-
-    // Recalculate product type based on new pricing structure (only for auto-generate mode)
-    const priceFixed = (updatedPrices?.length ?? 0) === 1;
-    const discountFixed = (updatedDiscounts?.length ?? 0) === 1;
-    const sizesFixed = !updatedSizes || updatedSizes.length === 1;
-    const colorsFixed = !updatedColors || updatedColors.length === 1;
-
-    let productType: ProductType = ProductType.VARIABLE_VARIABLE_VARIABLE;
-    if (priceFixed && discountFixed && sizesFixed && colorsFixed) {
-        productType = ProductType.FIXED_FIXED_FIXED;
-    } else if (priceFixed && discountFixed) {
-        productType = ProductType.FIXED_FIXED_VARIABLE;
+    if (id.startsWith('oopos-')) {
+        const code = id.replace('oopos-', '');
+        return await getProductByCode(code);
     }
 
-    // Clear sizeMaterialPricing if not explicitly provided
-    const updatedSizeMaterialPricing = data.sizeMaterialPricing !== undefined ? data.sizeMaterialPricing : product.sizeMaterialPricing;
-
-    await product.update({
-        name: data.name !== undefined ? (data.name || undefined) : product.name,
-        slug: nextSlug,
-        code: data.code !== undefined ? data.code : product.code,
-        description: data.description,
-        productType,
-        price: priceFixed ? updatedPrices?.[0] : undefined,
-        discount: discountFixed ? updatedDiscounts?.[0] : undefined,
-        sizes: sizesFixed ? updatedSizes : undefined,
-        colors: colorsFixed ? updatedColors : undefined,
-        sizeMaterialPricing: updatedSizeMaterialPricing,
-        images: data.images,
-        categoryId: data.categoryId,
-        manualVariants,
-        details: data.details !== undefined ? data.details : product.details,
-        isDetailsEnabled: data.isDetailsEnabled !== undefined ? data.isDetailsEnabled : product.isDetailsEnabled,
-        styles: data.styles !== undefined ? data.styles : product.styles,
+    const product = await Product.findByPk(id, {
+        include: [variantInclude, itemInclude],
     });
+    if (product) return product;
 
-    // Sync product items (add/update/delete)
-    await syncProductItems(id, data.items);
+    // Fallback: try as OOPOS code
+    try {
+        return await getProductByCode(id);
+    } catch {
+        throw new Error('Product not found');
+    }
+};
 
-    // Handle variants based on mode
-    if (manualVariants && data.variants !== undefined) {
-        // Manual variant mode: sync the provided variants
-        await syncProductVariants(id, data.variants);
-    } else if (!manualVariants) {
-        // Auto-generate mode: regenerate variants if sizes, colors, or pricing changed
-        const shouldRegenerateVariants =
-            data.sizes !== undefined ||
-            data.colors !== undefined ||
-            data.prices !== undefined ||
-            data.discounts !== undefined ||
-            data.sizePricing !== undefined ||
-            data.sizeMaterialPricing !== undefined;
+export const getProductsByCode = async (code: string, showAll: boolean = false) => {
+    return [await getProductByCode(code, showAll)];
+};
 
-        if (shouldRegenerateVariants) {
-            await regenerateProductVariants(
-                id,
-                updatedSizes,
-                updatedColors,
-                updatedPrices,
-                updatedDiscounts,
-                data.sizePricing,
-                data.variantImages,
-                data.images
-            );
+export const createProduct = async (data: any) => {
+    if (!data.code) throw new Error('Le code produit est requis');
+    if (!data.name) throw new Error('Le nom du produit est requis');
+
+    const price = Array.isArray(data.prices) && data.prices.length > 0
+        ? Number(data.prices[0])
+        : data.price != null ? Number(data.price) : 0;
+
+    const discount = Array.isArray(data.discounts) && data.discounts.length > 0
+        ? Number(data.discounts[0])
+        : data.discount != null ? Number(data.discount) : 0;
+
+    // Resolve category name for Famille field
+    let familleName = '';
+    if (data.categoryId) {
+        try {
+            const cat = await getCategoryById(data.categoryId);
+            familleName = cat?.name ?? '';
+        } catch { /* ignore */ }
+    }
+
+    const sizes: string[] = data.sizes?.length ? data.sizes : [''];
+    const colors: string[] = data.colors?.length ? data.colors : [''];
+    const prices: number[] = data.prices ?? [];
+    const discounts: number[] = data.discounts ?? [];
+
+    const ooposProduits: any[] = [];
+    const ooposTarifs: any[] = [];
+    let idx = 0;
+
+    for (const taille of sizes) {
+        for (const couleur of colors) {
+            const linePrice = prices[idx] != null ? Number(prices[idx]) : price;
+            const lineDiscount = discounts[idx] != null ? Number(discounts[idx]) : discount;
+
+            ooposProduits.push({
+                Produit: data.code,
+                Designation: data.name,
+                Famille: familleName,
+                Couleur: couleur,
+                Taille: taille,
+                Prix_Vente: linePrice,
+            });
+
+            ooposTarifs.push({
+                Tarif: 'STANDARD',
+                Produit: data.code,
+                Couleur: couleur,
+                Taille: taille,
+                Prix_Vente: linePrice,
+                Remise_Vente: lineDiscount,
+            });
+
+            idx++;
         }
     }
 
-    return getProductById(id);
+    const resProduits = await joolanService.importProduits(ooposProduits, {});
+    if (resProduits?.result === 'ko') {
+        throw new Error(`OOPOS a refusé le produit : ${resProduits.error_message ?? 'erreur inconnue'}`);
+    }
+
+    const resTarifs = await joolanService.importTarifs(ooposTarifs, {});
+    if (resTarifs?.result === 'ko') {
+        throw new Error(`OOPOS a refusé les tarifs : ${resTarifs.error_message ?? 'erreur inconnue'}`);
+    }
+
+    console.log(`[createProduct] OOPOS OK: ${data.code} (${ooposProduits.length} lignes) — produits: ${resProduits?.result}, tarifs: ${resTarifs?.result}`);
+
+    return {
+        code: data.code,
+        name: data.name,
+        famille: familleName,
+        sizes: data.sizes ?? [],
+        colors: data.colors ?? [],
+        price,
+        discount,
+        lines: ooposProduits.length,
+    };
+};
+
+export const updateProduct = async (id: string, data: any) => {
+    const product = await Product.findByPk(id);
+    if (!product) throw new Error('Produit introuvable');
+
+    if (data.name !== undefined) {
+        product.name = data.name;
+        const baseSlug = generateSlug(data.name || data.code || product.code);
+        product.slug = await ensureUniqueSlug(baseSlug, id);
+    }
+    if (data.code !== undefined) product.code = data.code;
+    if (data.description !== undefined) product.description = data.description;
+    if (data.price !== undefined) product.price = Number(data.price);
+    if (data.discount !== undefined) product.discount = Number(data.discount);
+    if (data.sizes !== undefined) product.sizes = data.sizes;
+    if (data.colors !== undefined) product.colors = data.colors;
+    if (data.images !== undefined) product.images = data.images;
+    if (data.categoryId !== undefined) product.categoryId = data.categoryId;
+    if (data.details !== undefined) product.details = data.details;
+    if (data.isDetailsEnabled !== undefined) product.isDetailsEnabled = data.isDetailsEnabled;
+    if (data.styles !== undefined) product.styles = data.styles;
+    if (data.manualVariants !== undefined) product.manualVariants = data.manualVariants;
+    if (data.sizeMaterialPricing !== undefined) product.sizeMaterialPricing = data.sizeMaterialPricing;
+    if (data.productType !== undefined) product.productType = data.productType;
+
+    await product.save();
+    return await Product.findByPk(id, { include: [variantInclude, itemInclude] });
 };
 
 export const deleteProduct = async (id: string) => {
     const product = await Product.findByPk(id);
-    if (!product) throw new Error("Product not found");
-
+    if (!product) throw new Error('Produit introuvable');
     await ProductVariant.destroy({ where: { productId: id } });
     await ProductItem.destroy({ where: { productId: id } });
     await product.destroy();
-
-    return { message: "Product deleted" };
+    return { message: 'Produit supprimé' };
 };
 
-// ─── Product Items (sub-pieces) CRUD ─────────────────────────────────────────
-
-export const addProductItem = async (productId: string, data: ProductItemInput) => {
+export const addProductItem = async (productId: string, data: any) => {
     const product = await Product.findByPk(productId);
-    if (!product) throw new Error("Product not found");
-
+    if (!product) throw new Error('Produit introuvable');
     const count = await ProductItem.count({ where: { productId } });
-    return ProductItem.create({
+    return await ProductItem.create({
         productId,
         name: data.name,
         code: data.code,
         description: data.description,
-        price: data.price,
-        discount: data.discount,
+        price: data.price != null ? Number(data.price) : undefined,
+        discount: data.discount != null ? Number(data.discount) : undefined,
         sizePricing: data.sizePricing,
         sizeMaterialPricing: data.sizeMaterialPricing,
-        sizes: data.sizes,
-        colors: data.colors,
-        images: data.images,
+        sizes: data.sizes ?? [],
+        colors: data.colors ?? [],
+        images: data.images ?? [],
         sortOrder: data.sortOrder ?? count,
     });
 };
 
-export const updateProductItem = async (itemId: string, data: Partial<ProductItemInput>) => {
+export const updateProductItem = async (itemId: string, data: any) => {
     const item = await ProductItem.findByPk(itemId);
-    if (!item) throw new Error("Item not found");
-    await item.update(data);
+    if (!item) throw new Error('Pièce introuvable');
+    if (data.name !== undefined) item.name = data.name;
+    if (data.code !== undefined) item.code = data.code;
+    if (data.description !== undefined) item.description = data.description;
+    if (data.price !== undefined) item.price = Number(data.price);
+    if (data.discount !== undefined) item.discount = Number(data.discount);
+    if (data.sizePricing !== undefined) item.sizePricing = data.sizePricing;
+    if (data.sizeMaterialPricing !== undefined) item.sizeMaterialPricing = data.sizeMaterialPricing;
+    if (data.sizes !== undefined) item.sizes = data.sizes;
+    if (data.colors !== undefined) item.colors = data.colors;
+    if (data.images !== undefined) item.images = data.images;
+    if (data.sortOrder !== undefined) item.sortOrder = data.sortOrder;
+    await item.save();
     return item;
 };
 
 export const deleteProductItem = async (itemId: string) => {
     const item = await ProductItem.findByPk(itemId);
-    if (!item) throw new Error("Item not found");
+    if (!item) throw new Error('Pièce introuvable');
     await item.destroy();
-    return { message: "Item deleted" };
+    return { message: 'Pièce supprimée' };
 };
 
-// ─── Product Variants (manual) CRUD ──────────────────────────────────────────
-
-export const addProductVariant = async (productId: string, data: VariantInput) => {
+export const addProductVariant = async (productId: string, data: any) => {
     const product = await Product.findByPk(productId);
-    if (!product) throw new Error("Product not found");
-
-    const count = await ProductVariant.count({ where: { productId } });
-
-    // Auto-generate SKU if not provided
-    const sku = data.sku || ("SKU-" + uuidv4().split("-")[0].toUpperCase());
-
-    return ProductVariant.create({
+    if (!product) throw new Error('Produit introuvable');
+    return await ProductVariant.create({
         productId,
         name: data.name,
         description: data.description,
         code: data.code,
-        price: data.price,
-        discount: data.discount,
+        price: data.price != null ? Number(data.price) : undefined,
+        discount: data.discount != null ? Number(data.discount) : undefined,
         size: data.size,
         color: data.color,
+        style: data.style,
         sizePricing: data.sizePricing,
         sizeMaterialPricing: data.sizeMaterialPricing,
-        sizes: data.sizes,
-        sku,
-        images: data.images,
-        sortOrder: data.sortOrder ?? count,
-        style: data.style,
+        sizes: data.sizes ?? [],
+        sku: data.sku,
+        images: data.images ?? [],
+        sortOrder: data.sortOrder ?? 0,
     });
 };
 
-export const updateProductVariant = async (variantId: string, data: Partial<VariantInput>) => {
+export const updateProductVariant = async (variantId: string, data: any) => {
     const variant = await ProductVariant.findByPk(variantId);
-    if (!variant) throw new Error("Variant not found");
-    await variant.update(data);
+    if (!variant) throw new Error('Variante introuvable');
+    const fields = ['name', 'description', 'code', 'size', 'color', 'style', 'sizePricing',
+        'sizeMaterialPricing', 'sizes', 'sku', 'images', 'sortOrder'];
+    for (const f of fields) {
+        if (data[f] !== undefined) (variant as any)[f] = data[f];
+    }
+    if (data.price !== undefined) variant.price = Number(data.price);
+    if (data.discount !== undefined) variant.discount = Number(data.discount);
+    await variant.save();
     return variant;
 };
 
 export const deleteProductVariant = async (variantId: string) => {
     const variant = await ProductVariant.findByPk(variantId);
-    if (!variant) throw new Error("Variant not found");
+    if (!variant) throw new Error('Variante introuvable');
     await variant.destroy();
-    return { message: "Variant deleted" };
+    return { message: 'Variante supprimée' };
 };

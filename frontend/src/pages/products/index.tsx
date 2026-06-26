@@ -46,6 +46,7 @@ export default function ProductsPage() {
   const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
   const [categoriesWithProducts, setCategoriesWithProducts] = useState<CategoryProducts[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   // Fetch products for each root category
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function ProductsPage() {
         try {
           const res = await api.get<ProductWithVariants[]>(
             `/products/category/${cat.id}/variants`,
-            { params: { _t: Date.now() } }
+            { params: { _t: Date.now(), showAll: showAll ? 'true' : undefined } }
           );
           results.push({
             category: cat,
@@ -83,7 +84,7 @@ export default function ProductsPage() {
     };
 
     fetchAllProducts();
-  }, [categories, categoriesLoading]);
+  }, [categories, categoriesLoading, showAll]);
 
   if (categoriesLoading || loadingProducts) {
     return <Loader />;
@@ -133,6 +134,39 @@ export default function ProductsPage() {
             }}>
               Tous les Produits
             </h1>
+          </div>
+
+          {/* Toggle: Afficher tous les produits */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <button
+              id="toggle-show-all"
+              onClick={() => setShowAll((prev) => !prev)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                background: "none",
+                border: "1px solid #c5bfb7",
+                padding: "10px 20px",
+                cursor: "pointer",
+                fontSize: "9px",
+                letterSpacing: "3px",
+                textTransform: "uppercase",
+                color: showAll ? "#fff" : "#0e0d0c",
+                backgroundColor: showAll ? "#0e0d0c" : "transparent",
+                transition: "all 0.25s ease",
+              }}
+            >
+              <span style={{
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                background: showAll ? "#c5bfb7" : "#0e0d0c",
+                display: "inline-block",
+                flexShrink: 0,
+              }} />
+              {showAll ? "Produits actifs uniquement" : "Afficher tous les produits"}
+            </button>
           </div>
         </FadeUp>
 

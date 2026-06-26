@@ -324,12 +324,12 @@ export const importTickets = async (tickets: any[], magasinsStocks?: string): Pr
   }
 };
 
-export const fetchTicketPdf = async (entete: string): Promise<any> => {
+export const fetchTicketPdf = async (entete: string, format: "receipt" | "A4" = "receipt"): Promise<any> => {
   try {
-    const response = await axios.get(`/api/tickets?action=pdf&Entete=${entete}`);
+    const response = await axios.get(`/api/tickets?action=pdf&Entete=${entete}&Format=${format}`);
     return response.data;
   } catch (error: any) {
-    console.error("Fetch tax-free error:", error);
+    console.error("Fetch ticket pdf error:", error);
     throw error;
   }
 };

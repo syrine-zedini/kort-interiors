@@ -8,6 +8,8 @@ import api from "@/libs/axios"; // your axios instance
 
 interface Props {
     categoryId: string;
+    showAll?: boolean;
+    onShowAllChange?: (value: boolean) => void;
 }
 
 interface ProductOrItem {
@@ -26,7 +28,7 @@ function findInTree(nodes: CategoryNode[], idOrSlug: string, parent: CategoryNod
     return null;
 }
 
-export default function Products({ categoryId }: Props) {
+export default function Products({ categoryId, showAll = false, onShowAllChange }: Props) {
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
     const [category, setCategory] = useState<SingleCategory | null>(null);
 
@@ -53,7 +55,7 @@ export default function Products({ categoryId }: Props) {
             try {
                 const res = await api.get<ProductWithVariants[]>(
                     `/products/category/${category.category.id}`,
-                    { params: { _t: Date.now() } }
+                    { params: { _t: Date.now(), ...(showAll ? { showAll: 'true' } : {}) } }
                 );
                 const productsList = res.data ?? [];
                 setProducts(productsList);
@@ -79,7 +81,7 @@ export default function Products({ categoryId }: Props) {
         };
 
         fetchProducts();
-    }, [category]);
+    }, [category, showAll]);
 
     if (categoriesLoading) {
         return (
@@ -110,9 +112,44 @@ export default function Products({ categoryId }: Props) {
                 isChild={category.parent != null}
                 parent_category={category.parent?.name}
                 parent_category_id={category.parent?.slug ?? category.parent?.id}
-                productCount={loadingProducts ? undefined : productsAndItems.length}
+                productCount={loadingProducts ? undefined : products.length}
                 banner_image={category.category.banner ?? undefined}
             />
+
+            {/* Toggle showAll button (shown only when parent provides onShowAllChange) */}
+            {onShowAllChange && (
+                <div style={{ maxWidth: "1440px", margin: "0 auto", padding: "16px 40px 0", display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                        id="toggle-show-all-category"
+                        onClick={() => onShowAllChange(!showAll)}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            background: "none",
+                            border: "1px solid #c5bfb7",
+                            padding: "10px 20px",
+                            cursor: "pointer",
+                            fontSize: "9px",
+                            letterSpacing: "3px",
+                            textTransform: "uppercase",
+                            color: showAll ? "#fff" : "#0e0d0c",
+                            backgroundColor: showAll ? "#0e0d0c" : "transparent",
+                            transition: "all 0.25s ease",
+                        }}
+                    >
+                        <span style={{
+                            width: "10px",
+                            height: "10px",
+                            borderRadius: "50%",
+                            background: showAll ? "#c5bfb7" : "#0e0d0c",
+                            display: "inline-block",
+                            flexShrink: 0,
+                        }} />
+                        {showAll ? "Produits actifs uniquement" : "Afficher tous les produits"}
+                    </button>
+                </div>
+            )}
 
             {errorProducts ? (
                 <p style={{ textAlign: "center", padding: "40px", color: "#aaa" }}>
