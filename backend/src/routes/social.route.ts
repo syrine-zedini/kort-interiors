@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
-import axios from 'axios';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
+const execAsync = promisify(exec);
 const router = Router();
 
 const INSTAGRAM_HANDLE = 'kort.interiors';
@@ -28,6 +30,7 @@ let cache: CacheEntry | null = null;
 /**
  * GET /api/v1/social/instagram
  * Retourne 5 posts récents via ScrapeCreators (profil public, pas de token Meta requis).
+ * Utilise curl pour contourner le TLS fingerprinting du VPS.
  */
 router.get('/instagram', async (_req: Request, res: Response) => {
   const apiKey = SCRAPECREATORS_KEY;
@@ -44,18 +47,18 @@ router.get('/instagram', async (_req: Request, res: Response) => {
   try {
     const url = `https://api.scrapecreators.com/v2/instagram/user/posts?handle=${INSTAGRAM_HANDLE}`;
 
-    const response = await axios.get(url, {
-      headers: { 'x-api-key': apiKey },
-    });
+    const { stdout } = await execAsync(
+      `curl -s --max-time 15 -H "x-api-key: ${apiKey}" "${url}"`
+    );
 
-    const json = response.data as { data?: { items?: any[] }; items?: any[] };
+    const json = JSON.parse(stdout) as { data?: { items?: any[] }; items?: any[] };
 
     /* ScrapeCreators v2 retourne data.items ou items selon la version */
     const raw: any[] = json?.data?.items ?? json?.items ?? [];
 
     /* Prendre les 6 posts les plus récents directement dans l'ordre chronologique */
     const posts: InstagramPost[] = raw
-      .filter((p: any) => p.media_type !== 2) // Filtrer les formats incompatibles si nécessaire
+      .filter((p: any) => p.media_type !== 2)
       .slice(0, 6)
       .map((p: any) => ({
         id: String(p.id ?? p.pk ?? ''),
@@ -78,7 +81,7 @@ router.get('/instagram', async (_req: Request, res: Response) => {
     return res.json({ data: posts, cached: false });
 
   } catch (err: any) {
-    console.error('[ScrapeCreators fetch error]', err.message);
+    console.error('[ScrapeCreators error]', err.message);
     if (cache) return res.json({ data: cache.data, cached: true, stale: true });
     return res.status(500).json({ message: 'Erreur serveur.' });
   }
