@@ -15,7 +15,10 @@ export const useCategories = () => {
 
             const res = await api.get<CategoriesResponse>("/categories");
 
-            setCategories(res.data.data);
+            const filtered = res.data.data.filter(
+                (cat) => (cat.productCount ?? 0) > 0 || (cat.children?.length ?? 0) > 0
+            );
+            setCategories(filtered);
         } catch (err: any) {
             setError(err?.response?.data?.message || "Failed to load categories");
         } finally {
