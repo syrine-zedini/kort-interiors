@@ -82,18 +82,31 @@ export default function ProductsPage() {
     enabled: source === "local",
   });
 
-  // ── Local categories (for dropdown) ──
+  // ── Categories for dropdown (OOPOS tree flattened) ──
   const { data: localCatsRaw = [] } = useQuery<{ id: string; name: string; parentIds: string[] }[]>({
-    queryKey: ["local-categories-flat"],
-    queryFn: async () => { const { data } = await api.get("/db-viewer/local-categories"); return data; },
-    enabled: source === "local",
+    queryKey: ["all-categories-flat"],
+    queryFn: async () => {
+      const { data } = await api.get("/categories");
+      const nodes: { id: string; name: string; parentIds: string[] }[] = [];
+      const flatten = (cats: any[], parentIds: string[] = []) => {
+        for (const cat of cats) {
+          if ((cat.productCount ?? 0) > 0 || (cat.children?.length ?? 0) > 0) {
+            nodes.push({ id: cat.id, name: cat.name, parentIds: cat.parentIds ?? parentIds });
+            if (cat.children?.length) flatten(cat.children, [cat.id]);
+          }
+        }
+      };
+      flatten(data.data ?? []);
+      return nodes;
+    },
   });
 
   const rayonIds = new Set(localCatsRaw.filter(c => c.parentIds.length === 0).map(c => c.id));
+  const familleIds = new Set(localCatsRaw.filter(c => c.parentIds.some(pid => rayonIds.has(pid))).map(c => c.id));
   const catsByLevel = [
     localCatsRaw.filter(c => c.parentIds.length === 0),
-    localCatsRaw.filter(c => c.parentIds.length > 0 && c.parentIds.some(pid => rayonIds.has(pid))),
-    localCatsRaw.filter(c => c.parentIds.length > 0 && !c.parentIds.some(pid => rayonIds.has(pid))),
+    localCatsRaw.filter(c => c.parentIds.some(pid => rayonIds.has(pid))),
+    localCatsRaw.filter(c => !rayonIds.has(c.id) && !familleIds.has(c.id) && c.parentIds.length > 0),
   ];
   const catMap = new Map(localCatsRaw.map(c => [c.id, c.name]));
 
