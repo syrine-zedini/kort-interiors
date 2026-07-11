@@ -266,9 +266,13 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
             variants
         };
 
-        if (result.images.length === 0 && result.code) {
-            result.images = await joolanService.getProductPosPhotos(result.code, result.sku);
-        }
+        // Always fetch full photo list from OOPOS SQL and merge with catalogue-web photos
+        try {
+            const posPhotos = await joolanService.getProductPosPhotos(result.code, result.sku);
+            if (posPhotos.length > 0) {
+                result.images = [...new Set([...posPhotos, ...result.images])];
+            }
+        } catch {}
 
         return result;
     } catch (error: any) {
