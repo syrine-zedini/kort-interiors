@@ -22,8 +22,14 @@ if (!USERNAME || !PASSWORD) {
 // avec l'intermédiaire officiel Sectigo, en plus des CA racines standard de Node —
 // la vérification TLS reste pleinement active, on ne fait que fournir le maillon manquant.
 const intermediateCertPath = path.join(__dirname, '../certs/sectigo-public-server-auth-ca-dv-r36.pem');
+let extraCa: string[] = [];
+try {
+  extraCa = [fs.readFileSync(intermediateCertPath, 'utf8')];
+} catch {
+  // cert file not present — use default Node CA chain
+}
 const httpsAgent = new https.Agent({
-  ca: [...tls.rootCertificates, fs.readFileSync(intermediateCertPath, 'utf8')],
+  ca: [...tls.rootCertificates, ...extraCa],
 });
 
 const clictopayClient = axios.create({
