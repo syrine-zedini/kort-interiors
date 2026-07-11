@@ -7,6 +7,7 @@ import LuxuryNavbar from "@/components/home/LuxuryNavbar";
 import { getUserProfile, updateUserProfile, UserProfile } from "@/services/user.service";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthModal from "@/components/home/AuthModal";
+import api from "@/libs/axios";
 
 const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "";
 
@@ -20,7 +21,7 @@ export default function CartPage() {
   const { totals } = useCartTotals();
   const [promoOpen, setPromoOpen] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"online" | "on_delivery">("online");
+  const [paymentMethod, setPaymentMethod] = useState<"online" | "on_delivery">("on_delivery");
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -111,10 +112,12 @@ export default function CartPage() {
     try {
       setIsPlacingOrder(true);
       if (placeOrder) {
-        await placeOrder(shippingAddress, undefined, paymentMethod);
-        // Redirect based on payment method
+        const result = await placeOrder(shippingAddress, undefined, paymentMethod);
         if (paymentMethod === "online") {
-          router.push("/cart/payment-success");
+          // Initialise le paiement ClicToPay puis redirige vers la page de paiement hébergée.
+          // La confirmation réelle (orderStatus === 2) est vérifiée côté backend après retour du client.
+          const { data } = await api.post("/clictopay/init", { commandeId: result.commandeId });
+          window.location.href = data.formUrl;
         } else {
           // For on_delivery payments, show success message and redirect to home
           showToastMsg("Votre commande a été passée avec succès !", "success");
@@ -534,7 +537,7 @@ export default function CartPage() {
                 MÉTHODE DE PAIEMENT
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer", color: "#1a1a1a" }}>
+                {/* <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer", color: "#1a1a1a" }}>
                   <input
                     type="radio"
                     name="paymentMethod"
@@ -544,7 +547,7 @@ export default function CartPage() {
                     style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#1a1a1a" }}
                   />
                   Paiement en ligne
-                </label>
+                </label> */}
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer", color: "#1a1a1a" }}>
                   <input
                     type="radio"

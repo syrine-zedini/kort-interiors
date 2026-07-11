@@ -8,6 +8,7 @@ export class ProductCategory extends Model {
     declare children?: ProductCategory[]
     declare parents?: ProductCategory[]
     declare banner?: string;
+    declare visible?: boolean;
     // Sequelize mixins for associations (optional)
     declare addParent?: BelongsToManyAddAssociationMixin<ProductCategory, string>;
     declare addChild?: BelongsToManyAddAssociationMixin<ProductCategory, string>;
@@ -36,6 +37,11 @@ ProductCategory.init(
         banner: {
             type: DataTypes.STRING(255),
             allowNull: true,
+        },
+        visible: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true,
+            allowNull: false,
         },
     },
     {

@@ -76,7 +76,7 @@ router.get('/', auth, async (req: Request, res: Response) => {
 router.patch('/:id/status', auth, async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    const validStatuses = ['pending', 'preconfirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }

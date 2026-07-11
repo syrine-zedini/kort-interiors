@@ -103,7 +103,10 @@ export const placeOrder = async (
     totalAmount: totals.subtotal,
     shippingAddress: { address: shippingAddress },
     paymentMethod: paymentMethod || 'on_delivery',
-    paymentStatus: paymentMethod === 'on_delivery' ? 'unpaid' : 'paid',
+    // 'unpaid' dans tous les cas : pour le paiement en ligne (ClicToPay), le passage à
+    // 'paid' se fait uniquement après vérification réelle via getOrderStatusExtended.do
+    // (voir backend/src/routes/clictopay.route.ts), jamais de manière optimiste ici.
+    paymentStatus: 'unpaid',
     trackingNumber: entete ? String(entete) : ticketId,
   });
 
@@ -125,6 +128,7 @@ export const placeOrder = async (
     success: true,
     entete,
     id: ticketId,
+    commandeId: commande.id,
     message: entete
       ? `Commande enregistrée dans OOPOS (ticket n°${entete})`
       : 'Commande enregistrée dans OOPOS',

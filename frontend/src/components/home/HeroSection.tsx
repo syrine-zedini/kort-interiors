@@ -253,25 +253,28 @@ export default function HeroSection() {
             </motion.p>
 
             {/* Boutons */}
-            <motion.div variants={heroItem} style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            {/* <motion.div variants={heroItem} style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
               <Link
                 href={getButtonLink(slides[activeIndex])}
                 style={{
                   display: "inline-block",
-                  padding: "14px 40px",
-                  background: "#fff",
-                  color: "#000",
+                  padding: "14px 44px",
+                  background: "#0e0d0c",
+                  color: "#fff",
+                  border: "none",
                   textDecoration: "none",
-                  fontSize: "9px",
-                  letterSpacing: "3px",
+                  fontSize: "12px",
+                  letterSpacing: "2px",
                   textTransform: "uppercase",
-                  fontWeight: 500,
+                  fontWeight: 600,
+                  transition: "background 0.3s",
+                  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
                 }}
                 className="hero-btn-primary"
               >
                 {slides[activeIndex]?.cta}
               </Link>
-            </motion.div>
+            </motion.div> */}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -384,7 +387,7 @@ export default function HeroSection() {
           border-radius: 3px !important;
         }
         .hero-btn-primary:hover {
-          background: rgba(255,255,255,0.88) !important;
+          background: #333 !important;
         }
         .hero-btn-outline:hover {
           background: rgba(255,255,255,0.1) !important;

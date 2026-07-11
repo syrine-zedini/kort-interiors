@@ -52,6 +52,53 @@ async function unlinkFromParent(parentId: string, childId: string) {
     );
 }
 
+// ─── Local PostgreSQL tree (used when productSource = 'local') ────────────────
+
+export async function getLocalCategoriesWithChildren() {
+    const cats = await ProductCategory.findAll({
+        include: [
+            { model: ProductCategory, as: 'parents', attributes: ['id'], through: { attributes: [] }, required: false },
+            { model: ProductCategory, as: 'children', attributes: ['id', 'name', 'slug'], through: { attributes: [] }, required: false },
+        ],
+    });
+
+    const countRows: { categoryId: string; count: string }[] = await sequelize.query(
+        'SELECT "categoryId", COUNT(*) as count FROM products WHERE "categoryId" IS NOT NULL GROUP BY "categoryId"',
+        { type: QueryTypes.SELECT }
+    ) as any;
+    const countMap: Record<string, number> = {};
+    for (const r of countRows) countMap[r.categoryId] = Number(r.count);
+
+    const makeNode = (cat: ProductCategory, visited: Set<string>): any => {
+        if (visited.has(String(cat.id))) return null;
+        const next = new Set(visited);
+        next.add(String(cat.id));
+        return {
+            id: cat.id,
+            name: cat.name,
+            slug: (cat as any).slug ?? generateSlug(cat.name),
+            productCount: countMap[String(cat.id)] ?? 0,
+            banner: (cat as any).banner ?? null,
+            parentIds: ((cat as any).parents ?? []).map((p: any) => p.id),
+            children: ((cat as any).children ?? [])
+                .filter((child: any) => {
+                    const full = cats.find(c => String(c.id) === String(child.id));
+                    return full && (full as any).visible !== false;
+                })
+                .map((child: any) => {
+                    const full = cats.find(c => String(c.id) === String(child.id));
+                    return full ? makeNode(full, next) : null;
+                })
+                .filter(Boolean),
+        };
+    };
+
+    const roots = cats.filter(c => !((c as any).parents?.length) && (c as any).visible !== false);
+    const nodes = roots.map(c => makeNode(c, new Set<string>())).filter(Boolean);
+    nodes.sort((a: any, b: any) => a.name.localeCompare(b.name));
+    return { data: nodes };
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 /** Build a recursive tree from a flat list of all categories. */
@@ -93,7 +140,6 @@ export async function getAllCategoriesWithChildren() {
                 ? ooposResponse.data 
                 : [];
 
-        // ✅ CORRECTION : Filter only active products (Actif = 1 or "1")
         const isActifValue = (v: any) => v === 1 || v === "1" || v === true;
         const activeProducts = ooposProducts.filter((p: any) =>
             isActifValue(p.Actif !== undefined ? p.Actif : p.actif)
@@ -113,9 +159,17 @@ export async function getAllCategoriesWithChildren() {
             }>;
         }> = {};
 
+        const OFFICIAL_RAYONS = new Set([
+            'ACCESSOIRES,DECORATION', 'ART DE TABLE', 'LINGE DE BAIN',
+            'LINGE DE LIT', 'LINGE DE TABLE', 'LITERIE'
+        ]);
+
         for (const p of activeProducts) {
-            const rayon = p.Rayon || p.rayon || 'Autres';
-            const famille = p.Famille || p.famille || '';
+            const rayon = (p.Rayon || p.rayon || '').trim();
+            if (!rayon || !OFFICIAL_RAYONS.has(rayon)) continue;
+            const rawFamille = (p.Famille || p.famille || '').trim();
+            const famille = rawFamille !== rayon ? rawFamille : '';
+            if (!famille) continue;
             const sousFamille = p.SousFamille || p.sousFamille || '';
 
             if (!structure[rayon]) {
@@ -136,6 +190,13 @@ export async function getAllCategoriesWithChildren() {
                     structure[rayon].families[famille].subfamilies[sousFamille].productsCount++;
                 }
             }
+        }
+
+        // Load all local banner records keyed by slug (for OOPOS category banner overrides)
+        const localBannerRecords = await ProductCategory.findAll({ attributes: ['slug', 'banner'] });
+        const bannerBySlug: Record<string, string | null> = {};
+        for (const r of localBannerRecords) {
+            if ((r as any).slug) bannerBySlug[(r as any).slug] = (r as any).banner ?? null;
         }
 
         // Convert structure into CategoryNode tree
@@ -168,7 +229,7 @@ export async function getAllCategoriesWithChildren() {
                         name: subName,
                         slug: subSlug,
                         productCount: subData.productsCount,
-                        banner: null,
+                        banner: bannerBySlug[subSlug] ?? null,
                         parentIds: [familleSlug],
                         children: [],
                     });
@@ -179,7 +240,7 @@ export async function getAllCategoriesWithChildren() {
                     name: familleName,
                     slug: familleSlug,
                     productCount: familleData.productsCount,
-                    banner: null,
+                    banner: bannerBySlug[familleSlug] ?? null,
                     parentIds: [rayonSlug],
                     children: subChildNodes,
                 });
@@ -190,7 +251,7 @@ export async function getAllCategoriesWithChildren() {
                 name: rayonName,
                 slug: rayonSlug,
                 productCount: rayonData.productsCount,
-                banner: null,
+                banner: bannerBySlug[rayonSlug] ?? null,
                 parentIds: [],
                 children: childNodes,
             });
@@ -199,7 +260,64 @@ export async function getAllCategoriesWithChildren() {
         // Sort alphabetically by name
         rootNodes.sort((a, b) => a.name.localeCompare(b.name));
 
-        return { data: rootNodes };
+        // ─── Merge visible local-only categories ──────────────────────────────
+        // Collect every name already in the OOPOS tree (all levels)
+        const ooposNames = new Set<string>();
+        const collectOoposNames = (nodes: any[]) => {
+            for (const n of nodes) {
+                ooposNames.add(n.name.trim().toUpperCase());
+                collectOoposNames(n.children || []);
+            }
+        };
+        collectOoposNames(rootNodes);
+
+        // Load local categories with parent/child associations
+        const localCats = await ProductCategory.findAll({
+            include: [
+                { model: ProductCategory, as: 'parents', attributes: ['id'], through: { attributes: [] }, required: false },
+                { model: ProductCategory, as: 'children', attributes: ['id', 'name', 'slug'], through: { attributes: [] }, required: false },
+            ],
+        });
+
+        // Recursively build a node from a local category (only follows visible children)
+        const makeLocalNode = (cat: ProductCategory, visited: Set<string>): any => {
+            if (visited.has(String(cat.id))) return null;
+            const next = new Set(visited);
+            next.add(String(cat.id));
+            return {
+                id: cat.id,
+                name: cat.name,
+                slug: (cat as any).slug ?? generateSlug(cat.name),
+                productCount: 0,
+                banner: (cat as any).banner ?? null,
+                parentIds: ((cat as any).parents ?? []).map((p: any) => p.id),
+                children: ((cat as any).children ?? [])
+                    .filter((ch: any) => {
+                        const full = localCats.find(c => String(c.id) === String(ch.id));
+                        return full && (full as any).visible === true;
+                    })
+                    .map((ch: any) => {
+                        const full = localCats.find(c => String(c.id) === String(ch.id));
+                        return full ? makeLocalNode(full, next) : null;
+                    })
+                    .filter(Boolean),
+            };
+        };
+
+        // Only root local categories that are explicitly visible AND not already in OOPOS
+        const localRoots = localCats.filter(c =>
+            !((c as any).parents?.length) &&
+            (c as any).visible === true &&
+            !ooposNames.has(c.name.trim().toUpperCase())
+        );
+
+        const localNodes = localRoots.map(c => makeLocalNode(c, new Set<string>())).filter(Boolean);
+
+        // Merge: OOPOS + local-only visible, sorted alphabetically
+        const allNodes = [...rootNodes, ...localNodes];
+        allNodes.sort((a, b) => a.name.localeCompare(b.name));
+
+        return { data: allNodes };
     } catch (err: any) {
         console.error('[getAllCategoriesWithChildren] Error:', err.message);
         throw err;
@@ -263,7 +381,7 @@ export async function createCategory(name: string, parentId?: string) {
         if (!parent) throw new Error('Parent category not found');
 
         await sequelize.query(
-            'INSERT INTO product_category_hierarchy ("parentId", "childId") VALUES (:parentId, :childId)',
+            'INSERT INTO product_category_hierarchy ("parentId", "childId", "createdAt", "updatedAt") VALUES (:parentId, :childId, NOW(), NOW())',
             { replacements: { parentId, childId: category.id }, type: QueryTypes.INSERT }
         );
     }
@@ -274,7 +392,8 @@ export async function createCategory(name: string, parentId?: string) {
 // ─── Update ───────────────────────────────────────────────────────────────────
 
 export async function renameCategory(id: string, newName: string) {
-    const category = await ProductCategory.findByPk(id);
+    let category = await ProductCategory.findByPk(id);
+    if (!category) category = await ProductCategory.findOne({ where: { slug: id } });
     if (!category) throw new Error('Category not found');
 
     const existing = await ProductCategory.findOne({ where: { name: newName, id: { [require('sequelize').Op.ne]: id } } });
@@ -305,7 +424,8 @@ export async function deleteCategory(
     moveProductsTo: string | null = null,
     deleteChildren: boolean = false
 ) {
-    const category = await ProductCategory.findByPk(id);
+    let category = await ProductCategory.findByPk(id);
+    if (!category) category = await ProductCategory.findOne({ where: { slug: id } });
     if (!category) throw new Error('Category not found');
 
     if (deleteChildren) {
@@ -356,7 +476,7 @@ export async function addChildToParent(parentId: string, childId: string) {
     }
 
     await sequelize.query(
-        'INSERT INTO product_category_hierarchy ("parentId", "childId") VALUES (:parentId, :childId)',
+        'INSERT INTO product_category_hierarchy ("parentId", "childId", "createdAt", "updatedAt") VALUES (:parentId, :childId, NOW(), NOW())',
         { replacements: { parentId, childId }, type: QueryTypes.INSERT }
     );
 

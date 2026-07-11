@@ -1,4 +1,5 @@
 import axios from "axios";
+import api from "@/lib/axios";
 
 export interface StockData {
   Magasin: string;
@@ -287,6 +288,17 @@ export const importClients = async (clients: any[]): Promise<any> => {
     console.error("Import clients error:", error);
     throw error;
   }
+};
+
+// ─── OOPOS TICKET STATUSES (local tracking) ───────────────────────────────────
+
+export const fetchOoposTicketStatuses = async (date: string): Promise<Record<string, string>> => {
+  const { data } = await api.get(`/oopos-ticket-statuses?date=${date}`);
+  return data;
+};
+
+export const updateOoposTicketStatus = async (entete: string, status: string, ticketDate: string): Promise<void> => {
+  await api.patch(`/oopos-ticket-statuses/${entete}`, { status, ticketDate });
 };
 
 // ─── TICKETS & COMMANDES ───────────────────────────────────────────────────────

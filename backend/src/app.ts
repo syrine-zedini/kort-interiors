@@ -9,17 +9,25 @@ import usersRoutes from "./routes/users.route"
 import cartRoutes from "./routes/cart.route"
 import commandeRoutes from "./routes/commande.route"
 import paymentRoutes from "./routes/payment.route"
+import clictopayRoutes from "./routes/clictopay.route"
 import blogRoutes from "./routes/blog.route"
 import heroSlidesRoutes from "./routes/heroSlides.route"
 import promotionsRoutes from "./routes/promotions.route"
 import stylesRoutes from "./routes/styles.route"
 import joolanRoutes from "./routes/joolan.route"
+import dbViewerRoutes from "./routes/db-viewer.route"
+import settingsRoutes from "./routes/settings.route"
+import ooposTicketStatusRoutes from "./routes/oopos-ticket-status.route"
+import { loadSiteSettings } from "./config/siteSettings"
 import cors from 'cors';
 import path from 'path';
+import axios from 'axios';
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger";
 import { getProductById } from "./services/product.service";
 import { getCategoryById } from "./services/categories.service";
+
+loadSiteSettings();
 
 const app = express();
 const version = process.env.API_VERSION || 'v1'
@@ -43,6 +51,38 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+// Proxy OOPOS product photos — tries several URL patterns so the frontend
+// never needs to know about OOPOS auth or internal file naming.
+app.get("/oopos-photo/:sku/:n", async (req: Request, res: Response) => {
+  const sku = String(req.params.sku);
+  const n   = String(req.params.n);
+  const domain  = process.env.OOPOS_DOMAIN   || 'caisse.oopos.fr';
+  const enseigne = process.env.OOPOS_ENSEIGNE || '';
+  const apiKey  = process.env.OOPOS_API_KEY   || '';
+
+  const candidates = [
+    `https://${domain}/public/image/${enseigne}/${sku}-${n}.jpg`,
+    `https://${domain}/public/image/${enseigne}/${sku}.jpg`,
+    `https://${domain}/api/v2/produit-photo.do?enseigne=${encodeURIComponent(enseigne)}&api-key=${encodeURIComponent(apiKey)}&Sku=${encodeURIComponent(sku)}&Photo=${n}`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const img = await axios.get(url, { responseType: 'arraybuffer', timeout: 8000 });
+      if (img.status === 200 && img.data?.byteLength > 0) {
+        const ct = img.headers['content-type'] || 'image/jpeg';
+        res.setHeader('Content-Type', ct);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(Buffer.from(img.data));
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  res.status(404).send('Photo not found');
+});
 
 app.use(
   "/public",
@@ -68,11 +108,15 @@ app.use(`/api/${version}/users`, usersRoutes)
 app.use(`/api/${version}/cart`, cartRoutes)
 app.use(`/api/${version}/commandes`, commandeRoutes)
 app.use(`/api/${version}/payment`, paymentRoutes)
+app.use(`/api/${version}/clictopay`, clictopayRoutes)
 app.use(`/api/${version}/blogs`, blogRoutes)
 app.use(`/api/${version}/hero-slides`, heroSlidesRoutes)
 app.use(`/api/${version}/promotions`, promotionsRoutes)
 app.use(`/api/${version}/styles`, stylesRoutes)
 app.use(`/api/${version}/joolan`, joolanRoutes)
+app.use(`/api/${version}/db-viewer`, dbViewerRoutes)
+app.use(`/api/${version}/settings`, settingsRoutes)
+app.use(`/api/${version}/oopos-ticket-statuses`, ooposTicketStatusRoutes)
 
 // Backward-compatible mounts (non-versioned)
 app.use("/products", productRoutes);

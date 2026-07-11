@@ -14,6 +14,8 @@ import { CommandeItem } from './commande_item.model';
 import { Blog } from './blog.model';
 import { Style } from './style.model';
 import { HeroSlide } from './heroSlide.model';
+import { OoposProductPhoto } from './oopos_product_photos.model';
+import { OoposTicketStatus } from './oopos_ticket_status.model';
 
 // Associations Role <-> Permission (many-to-many)
 
@@ -99,5 +101,5 @@ CommandeItem.belongsTo(Commande, { foreignKey: 'commandeId', as: 'commande' });
 CommandeItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 Product.hasMany(CommandeItem, { foreignKey: 'productId', as: 'commandeItems' });
 
-export { User, Role, Permission, RolePermission, ProductCategory, Product, ProductVariant, ProductItem, Promotion, Color, CartItem, Commande, CommandeItem, Blog, Style, HeroSlide };
+export { User, Role, Permission, RolePermission, ProductCategory, Product, ProductVariant, ProductItem, Promotion, Color, CartItem, Commande, CommandeItem, Blog, Style, HeroSlide, OoposProductPhoto, OoposTicketStatus };
 

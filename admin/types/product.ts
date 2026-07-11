@@ -54,6 +54,7 @@ export interface Product {
   manualVariants?: boolean;
   variants?: ProductVariant[];
   items?: ProductItem[];
+  visible?: boolean;
 }
 
 export interface Category {

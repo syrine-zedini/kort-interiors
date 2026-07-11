@@ -5,13 +5,14 @@ import { User } from './user.model';
 interface CommandeAttributes {
   id: string;
   userId: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'preconfirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   totalAmount: number;
   shippingAddress?: object;
   billingAddress?: object;
   paymentMethod?: string;
   paymentStatus: 'unpaid' | 'paid' | 'failed' | 'refunded';
   trackingNumber?: string;
+  clictopayOrderId?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -28,6 +29,7 @@ export class Commande extends Model<CommandeAttributes, CommandeCreationAttribut
   declare paymentMethod?: string;
   declare paymentStatus: 'unpaid' | 'paid' | 'failed' | 'refunded';
   declare trackingNumber?: string;
+  declare clictopayOrderId?: string;
 
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
@@ -50,7 +52,7 @@ Commande.init(
       onDelete: 'CASCADE',
     },
     status: {
-      type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled'),
+      type: DataTypes.ENUM('pending', 'preconfirmed', 'processing', 'shipped', 'delivered', 'cancelled'),
       allowNull: false,
       defaultValue: 'pending',
     },
@@ -76,6 +78,10 @@ Commande.init(
       defaultValue: 'unpaid',
     },
     trackingNumber: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    clictopayOrderId: {
       type: DataTypes.STRING,
       allowNull: true,
     },

@@ -1,6 +1,9 @@
 import { Router } from 'express';
+import { getSiteSettings } from '../config/siteSettings';
+import { ProductCategory } from '../models/product_categories.model';
 import {
     getAllCategoriesWithChildren,
+    getLocalCategoriesWithChildren,
     getCategoryById,
     createCategory,
     renameCategory,
@@ -9,7 +12,7 @@ import {
     addChildToParent,
     removeChildFromParent,
 } from '../services/categories.service';
-import { authorize } from '../middleware/authorize';
+import { adminAuth } from '../middleware/adminAuth';
 
 const router = Router();
 
@@ -17,7 +20,10 @@ const router = Router();
 
 router.get('/', async (req, res) => {
     try {
-        const result = await getAllCategoriesWithChildren();
+        const { productSource } = getSiteSettings();
+        const result = productSource === 'local'
+            ? await getLocalCategoriesWithChildren()
+            : await getAllCategoriesWithChildren();
         res.json(result);
     } catch (err: any) {
         res.status(400).json({ message: err.message });
@@ -27,7 +33,7 @@ router.get('/', async (req, res) => {
 // GET /categories/:id
 router.get('/:id', async (req, res) => {
     try {
-        const cat = await getCategoryById(req.params.id);
+        const cat = await getCategoryById(String(req.params.id));
         res.json(cat);
     } catch (err: any) {
         res.status(404).json({ message: err.message });
@@ -35,7 +41,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /categories  — body: { name, parentId? }
-router.post('/', async (req, res) => {
+router.post('/', adminAuth, async (req, res) => {
     try {
         const { name, parentId } = req.body;
         if (!name) return res.status(400).json({ message: 'name is required' });
@@ -47,8 +53,9 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /categories/:id  — body: { name?, banner? }
-router.put('/:id', async (req, res) => {
+router.put('/:id', adminAuth, async (req, res) => {
     try {
+        const id = String(req.params.id);
         const { name, banner } = req.body;
 
         // If neither name nor banner is provided
@@ -60,12 +67,12 @@ router.put('/:id', async (req, res) => {
 
         // Update name if provided
         if (name) {
-            result = await renameCategory(req.params.id, name);
+            result = await renameCategory(id, name);
         }
 
         // Update banner if provided
         if (banner !== undefined) {
-            result = await updateCategoryBanner(req.params.id, banner);
+            result = await updateCategoryBanner(id, banner);
         }
 
         res.json(result);
@@ -74,13 +81,28 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+// PATCH /categories/:id/visible  — toggle visibility
+router.patch('/:id/visible', adminAuth, async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        let cat: ProductCategory | null = await ProductCategory.findByPk(id);
+        if (!cat) cat = await ProductCategory.findOne({ where: { slug: id } });
+        if (!cat) return res.status(404).json({ message: 'Category not found' });
+        (cat as any).visible = !(cat as any).visible;
+        await cat.save();
+        res.json({ id: cat.id, visible: (cat as any).visible });
+    } catch (err: any) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
 // DELETE /categories/:id
 // body: { moveProductsTo?: string | null, deleteChildren?: boolean }
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', adminAuth, async (req, res) => {
     try {
         const { moveProductsTo, deleteChildren } = req.body;
         const result = await deleteCategory(
-            req.params.id,
+            String(req.params.id),
             moveProductsTo ?? null,
             deleteChildren === true
         );
@@ -91,9 +113,9 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /categories/:parentId/children/:childId  — link existing child to a parent
-router.post('/:parentId/children/:childId', async (req, res) => {
+router.post('/:parentId/children/:childId', adminAuth, async (req, res) => {
     try {
-        const result = await addChildToParent(req.params.parentId, req.params.childId);
+        const result = await addChildToParent(String(req.params.parentId), String(req.params.childId));
         res.status(201).json(result);
     } catch (err: any) {
         res.status(400).json({ message: err.message });
@@ -101,9 +123,9 @@ router.post('/:parentId/children/:childId', async (req, res) => {
 });
 
 // DELETE /categories/:parentId/children/:childId  — unlink (child becomes top-level)
-router.delete('/:parentId/children/:childId', async (req, res) => {
+router.delete('/:parentId/children/:childId', adminAuth, async (req, res) => {
     try {
-        const result = await removeChildFromParent(req.params.parentId, req.params.childId);
+        const result = await removeChildFromParent(String(req.params.parentId), String(req.params.childId));
         res.json(result);
     } catch (err: any) {
         res.status(400).json({ message: err.message });

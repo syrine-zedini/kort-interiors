@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserProfile, UserProfile } from '@/services/user.service';
 import LuxuryNavbar from '@/components/home/LuxuryNavbar';
+import AuthModal from '@/components/home/AuthModal';
 
 export default function ProfileView() {
   const router = useRouter();
@@ -10,6 +11,7 @@ export default function ProfileView() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Decode role from JWT token stored in localStorage
   const getRoleFromToken = (): string | null => {
@@ -43,19 +45,26 @@ export default function ProfileView() {
 
     // Check authentication - only if auth is fully loaded
     if (!authContext.isAuthenticated) {
-      setError('You must be logged in to view your profile');
+      setError('not_authenticated');
       setIsLoading(false);
       return;
     }
 
-    // Fetch user profile
-    const fetchProfile = async () => {
+    // Auth is valid — clear any previous error and fetch profile
+    setError(null);
+
+    const fetchProfile = async (attempt = 0) => {
       try {
         setIsLoading(true);
         const data = await getUserProfile();
         setProfile(data);
+        setError(null);
       } catch (err: any) {
         console.error('Profile fetch error:', err);
+        if (err.message === 'Network Error' && attempt === 0) {
+          setTimeout(() => fetchProfile(1), 800);
+          return;
+        }
         setError(err.response?.data?.message || err.message || 'Failed to load profile');
       } finally {
         setIsLoading(false);
@@ -90,6 +99,67 @@ export default function ProfileView() {
             }}
           >
             Chargement du profil...
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error === 'not_authenticated') {
+    return (
+      <>
+        <LuxuryNavbar transparent={false} />
+        <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+        <div
+          style={{
+            minHeight: '100vh',
+            background: '#f5f5f5',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '96px 24px 24px',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #e8e8e8',
+              padding: '32px 36px',
+              maxWidth: 420,
+              width: '100%',
+              textAlign: 'center',
+            }}
+          >
+            <p
+              style={{
+                fontSize: 10,
+                letterSpacing: 2.5,
+                textTransform: 'uppercase',
+                color: '#8a8a8a',
+                marginBottom: 12,
+              }}
+            >
+              Accès restreint
+            </p>
+            <p style={{ fontSize: 15, color: '#1a1a1a', marginBottom: 24 }}>
+              Vous devez être connecté pour accéder à votre profil.
+            </p>
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              style={{
+                padding: '13px 32px',
+                background: '#1a1a1a',
+                color: '#fff',
+                border: 'none',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: 1.4,
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              Se connecter
+            </button>
           </div>
         </div>
       </>

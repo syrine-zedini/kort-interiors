@@ -210,6 +210,32 @@ const REQUIRED_COLUMNS: ColumnSpec[] = [
       allowNull: true,
     },
   },
+  {
+    table: "commandes",
+    column: "clictopayOrderId",
+    definition: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+  },
+  {
+    table: "products",
+    column: "visible",
+    definition: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
+  },
+  {
+    table: "product_categories",
+    column: "visible",
+    definition: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      allowNull: false,
+    },
+  },
 ];
 
 const ensureColumn = async (qi: QueryInterface, spec: ColumnSpec) => {
@@ -231,6 +257,26 @@ export const runMigrations = async (sequelize: Sequelize) => {
   await migrateUsersAddress(sequelize);
   await removeStockColumn(sequelize);
   await migrateCodeRequiredNameOptional(sequelize);
+  // Create oopos_ticket_statuses table (raw SQL to avoid circular import)
+  try {
+    await sequelize.query(`
+      DO $$ BEGIN
+        CREATE TYPE "enum_oopos_ticket_statuses_status"
+          AS ENUM ('pending', 'preconfirmed', 'confirmed', 'cancelled');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
+    `);
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS "oopos_ticket_statuses" (
+        "entete"     VARCHAR(255) NOT NULL PRIMARY KEY,
+        "status"     "enum_oopos_ticket_statuses_status" NOT NULL DEFAULT 'pending',
+        "ticketDate" DATE NOT NULL
+      );
+    `);
+    console.log('✅ oopos_ticket_statuses table ready');
+  } catch (err: any) {
+    console.error('oopos_ticket_statuses migration error:', err.message);
+  }
 
   // Fix types if they were created as varchar
   try {

@@ -423,7 +423,7 @@ export default function List({ loading, data, categorySlug }: Props) {
                 {isItemCard && cardItem ? (
                   <div
                     onClick={() => {
-                      const productSlug = product.slug ?? product.id;
+                      const productSlug = (product.slug ?? product.id)?.replace(/\//g, '~');
                       router.push(`/products/${categorySlug}/${productSlug}/${cardItem.id}`);
                     }}
                     style={{
@@ -475,7 +475,7 @@ export default function List({ loading, data, categorySlug }: Props) {
                   <ProductCard
                     product={cardProduct}
                     onSelect={() => {
-                      const productSlug = (cardProduct as any)?.slug ?? cardProduct?.id;
+                      const productSlug = ((cardProduct as any)?.slug ?? cardProduct?.id)?.replace(/\//g, '~');
                       router.push(`/products/${categorySlug}/${productSlug}`);
                     }}
                   />

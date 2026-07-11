@@ -20,6 +20,7 @@ if (OOPOS_MAGASIN) {
 
 const joolanClient = axios.create({
   baseURL: BASE_URL,
+  timeout: 20000,
 });
 
 joolanClient.interceptors.request.use((config) => {
@@ -101,18 +102,51 @@ export const getImageStocks = (params: any) => genericGet('/image-stocks.do', pa
 export const getImageFullStocks = (params: any) => genericGet('/image-full-stocks.do', params);
 
 // --- Catalogue Web ---
-// Filtrage par magasin : si OOPOS_MAGASIN est défini dans .env, il est
-// automatiquement passé à catalogue-web.do pour reproduire exactement
-// le même filtrage que l'interface caisse OOPOS.
+// Cache to avoid exceeding OOPOS hourly API rate limit.
+// All calls to catalogue-web.do share the same cached response for 20 minutes.
+// After a rate-limit error, retries are blocked for 5 minutes (backoff).
+let _catalogueCache: { data: any; ts: number } | null = null;
+const CATALOGUE_TTL = 20 * 60 * 1000; // 20 minutes
+
+let _catalogueBackoffUntil = 0;
+const CATALOGUE_BACKOFF = 5 * 60 * 1000; // 5 minutes backoff after rate limit
+
 export const getCatalogueWeb = async (params: any) => {
+  // Fresh cache — return immediately
+  if (_catalogueCache && Date.now() - _catalogueCache.ts < CATALOGUE_TTL) {
+    return _catalogueCache.data;
+  }
+  // Backoff active — OOPOS returned rate limit recently, don't retry yet
+  if (Date.now() < _catalogueBackoffUntil) {
+    if (_catalogueCache) return _catalogueCache.data;
+    return [];
+  }
   const finalParams = { ...params };
   if (OOPOS_MAGASIN) {
     finalParams['Magasin'] = OOPOS_MAGASIN;
   }
-  console.log(`[getCatalogueWeb] params:`, JSON.stringify(finalParams));
-  const data = await genericGet('/catalogue-web.do', finalParams);
-  return data;
+  try {
+    const data = await genericGet('/catalogue-web.do', finalParams);
+    if (Array.isArray(data) && data.length > 0) {
+      _catalogueCache = { data, ts: Date.now() };
+      return data;
+    }
+    // OOPOS returned error (rate limit, 503, etc.)
+    console.warn(`[OOPOS] catalogue-web.do error: ${JSON.stringify(data)?.substring(0, 200)}`);
+    _catalogueBackoffUntil = Date.now() + CATALOGUE_BACKOFF;
+    if (_catalogueCache) {
+      console.warn(`[OOPOS] Using stale cache (${Math.round((Date.now() - _catalogueCache.ts) / 1000)}s old)`);
+      return _catalogueCache.data;
+    }
+    return [];
+  } catch (err) {
+    _catalogueBackoffUntil = Date.now() + CATALOGUE_BACKOFF;
+    if (_catalogueCache) return _catalogueCache.data;
+    throw err;
+  }
 };
+
+export const clearCatalogueCache = () => { _catalogueCache = null; };
 
 /**
  * Récupère la liste de tous les magasins distincts présents dans
@@ -132,3 +166,128 @@ export const getMagasinsDisponibles = async (): Promise<string[]> => {
 
 // --- Utilitaires ---
 export const eanExiste = (params: any) => genericGet('/ean-existe.do', params);
+
+// --- Photos POS (caisse) ---
+const _photoCache = new Map<string, { urls: string[]; ts: number }>();
+const PHOTO_TTL = 60 * 60 * 1000; // 1h
+
+// Circuit breaker: stop calling query.do when OOPOS is down (503 / socket hang up)
+let _queryCircuitOpen = false;
+let _queryCircuitOpenedAt = 0;
+const QUERY_CIRCUIT_TTL = 10 * 60 * 1000; // 10 minutes
+
+function isQueryAvailable(): boolean {
+    if (!_queryCircuitOpen) return true;
+    if (Date.now() - _queryCircuitOpenedAt > QUERY_CIRCUIT_TTL) {
+        _queryCircuitOpen = false;
+        return true;
+    }
+    return false;
+}
+
+function tripQueryCircuit() {
+    if (!_queryCircuitOpen) {
+        _queryCircuitOpen = true;
+        _queryCircuitOpenedAt = Date.now();
+    }
+}
+
+export function buildCdnUrl(hash: string): string {
+    if (!hash || hash.length < 8) return '';
+    if (hash.startsWith('http')) return hash;
+    // hash may already include extension (e.g. "abc123.jpg") or be a bare MD5
+    const name = /\.\w{2,4}$/.test(hash) ? hash : `${hash}.jpg`;
+    return `https://${OOPOS_DOMAIN}/smart/cdn/${name}`;
+}
+
+export const getProductPosPhotos = async (productCode: string, _sku?: string | number): Promise<string[]> => {
+    const cacheKey = productCode;
+    const cached = _photoCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < PHOTO_TTL) return cached.urls;
+
+    // 1. Local DB override
+    try {
+        const { OoposProductPhoto } = await import('../models/oopos_product_photos.model');
+        const row = await OoposProductPhoto.findByPk(productCode);
+        if (row?.photo_urls?.length) {
+            _photoCache.set(cacheKey, { urls: row.photo_urls, ts: Date.now() });
+            return row.photo_urls;
+        }
+    } catch {}
+
+    // If OOPOS query.do is known to be down, skip and cache empty result
+    if (!isQueryAvailable()) {
+        _photoCache.set(cacheKey, { urls: [], ts: Date.now() });
+        return [];
+    }
+
+    const esc = productCode.replace(/'/g, "''");
+
+    // Helper: extract non-empty photo hashes from a row
+    const extractPhotos = (row: any): string[] =>
+        ['Photo1','Photo2','Photo3','Photo4','Photo5','Photo6','Photo7','Photo8']
+            .map(k => row[k])
+            .filter((v: any) => v && String(v).length > 8)
+            .map((h: any) => buildCdnUrl(String(h)));
+
+    const safeQuery = async (sql: string): Promise<any> => {
+        try {
+            return await runQuery(sql, {});
+        } catch (err: any) {
+            if (err?.response?.status === 503 || err?.code === 'ECONNRESET' || err?.message?.includes('socket hang up')) {
+                tripQueryCircuit();
+            }
+            return null;
+        }
+    };
+
+    // 2. catalogue_show
+    const res1 = await safeQuery(`SELECT Photo1 FROM catalogue_show WHERE Produit = '${esc}' LIMIT 1`);
+    if (res1?.result === 'ok' && Array.isArray(res1?.data) && res1.data.length && res1.data[0].Photo1) {
+        const url = buildCdnUrl(String(res1.data[0].Photo1));
+        if (url) {
+            _photoCache.set(cacheKey, { urls: [url], ts: Date.now() });
+            return [url];
+        }
+    }
+    if (!isQueryAvailable()) {
+        _photoCache.set(cacheKey, { urls: [], ts: Date.now() });
+        return [];
+    }
+
+    // 3. produits_couleurs — Photo1-Photo8 per product+color
+    const res2 = await safeQuery(
+        `SELECT Photo1, Photo2, Photo3, Photo4, Photo5, Photo6, Photo7, Photo8 FROM produits_couleurs WHERE Produit = '${esc}' LIMIT 8`
+    );
+    if (res2?.result === 'ok' && Array.isArray(res2?.data)) {
+        const urls: string[] = [...new Set<string>(res2.data.flatMap(extractPhotos))];
+        if (urls.length) {
+            _photoCache.set(cacheKey, { urls, ts: Date.now() });
+            return urls;
+        }
+    }
+    if (!isQueryAvailable()) {
+        _photoCache.set(cacheKey, { urls: [], ts: Date.now() });
+        return [];
+    }
+
+    // 4. web_catalogues
+    const wc = await safeQuery(`SELECT * FROM web_catalogues WHERE Produit = '${esc}' LIMIT 1`);
+    if (wc?.result === 'ok' && Array.isArray(wc?.data) && wc.data.length) {
+        const urls = extractPhotos(wc.data[0]);
+        if (urls.length) {
+            _photoCache.set(cacheKey, { urls, ts: Date.now() });
+            return urls;
+        }
+    }
+
+    // Cache the empty result — prevents hammering OOPOS on every request
+    _photoCache.set(cacheKey, { urls: [], ts: Date.now() });
+    return [];
+};
+
+export const setProductPosPhotos = async (productCode: string, photoUrls: string[]): Promise<void> => {
+    const { OoposProductPhoto } = await import('../models/oopos_product_photos.model');
+    await OoposProductPhoto.upsert({ product_code: productCode, photo_urls: photoUrls });
+    _photoCache.set(productCode, { urls: photoUrls, ts: Date.now() });
+};

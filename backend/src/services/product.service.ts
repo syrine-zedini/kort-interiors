@@ -2,15 +2,70 @@ import { Op } from 'sequelize';
 import { Product } from '../models/product.model';
 import { ProductVariant } from '../models/product_variant';
 import { ProductItem } from '../models/product_item.model';
-import { generateSlug } from '../helpers/slug';
+import { ProductCategory } from '../models/product_categories.model';
+import { generateSlug, isUUID } from '../helpers/slug';
 import * as joolanService from "./joolan.service";
 import { getCategoryById } from "./categories.service";
+
+/** Returns all products from a local PostgreSQL category in the same shape as OOPOS. */
+export const getLocalCategoryVariants = async (categoryId: string) => {
+    // Support lookup by UUID or by slug
+    let cat = isUUID(categoryId) ? await ProductCategory.findByPk(categoryId) : null;
+    if (!cat) cat = await ProductCategory.findOne({ where: { slug: categoryId } });
+
+    const catId = cat ? String(cat.id) : categoryId;
+
+    const products = await Product.findAll({
+        where: { categoryId: catId, visible: true } as any,
+        include: [{ model: ProductVariant, as: 'variants', required: false }],
+    });
+
+    const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? '';
+
+    return products.map((p: any) => ({
+        id: p.id,
+        code: p.code ?? '',
+        name: p.name ?? '',
+        description: p.description ?? '',
+        price: p.price ?? 0,
+        discount: p.discount ?? 0,
+        images: (p.images ?? []).map((img: string) =>
+            img.startsWith('http') ? img : `${IMAGE_BASE}${img}`
+        ),
+        slug: p.slug ?? '',
+        mainProductId: p.id,
+        variantId: p.id,
+        variants: (p.variants ?? []).map((v: any) => ({
+            id: v.id,
+            sku: v.sku ?? '',
+            size: v.size ?? '',
+            color: v.color ?? '',
+            price: v.price ?? p.price ?? 0,
+            discount: v.discount ?? 0,
+            images: v.images ?? [],
+        })),
+    }));
+};
 
 /** Returns true if a product SKU is active (Actif = 1, "1", or true). */
 const isActif = (product: any): boolean => {
     const v = product.Actif !== undefined ? product.Actif : product.actif;
     return v === 1 || v === "1" || v === true;
 };
+
+const OOPOS_CDN = `https://${process.env.OOPOS_DOMAIN || 'caisse.oopos.fr'}/smart/cdn`;
+
+/** Returns Photo1-Photo8 from catalogue-web.do as full CDN URLs. */
+function buildOoposImages(p: any): string[] {
+    return ['Photo1','Photo2','Photo3','Photo4','Photo5','Photo6','Photo7','Photo8']
+        .map(k => p[k] || p[k.toLowerCase()] || '')
+        .filter(v => v && v.length > 8)
+        .map(hash => {
+            if (hash.startsWith('http')) return hash;
+            const name = /\.\w{2,4}$/.test(hash) ? hash : `${hash}.jpg`;
+            return `${OOPOS_CDN}/${name}`;
+        });
+}
 
 /**
  * OOPOS-ONLY: Get products for a specific category
@@ -19,54 +74,36 @@ const isActif = (product: any): boolean => {
  */
 export const getProductsByCategoryId = async (categoryId: string, showAll: boolean = false) => {
     try {
-        console.log(`[getProductsByCategoryId] Starting with categoryId="${categoryId}" showAll=${showAll}`);
-        
-        // Step 1: Get category from OOPOS hierarchy
         const category = await getCategoryById(categoryId);
-        console.log(`[getProductsByCategoryId] Found category: id="${category.id}" name="${category.name}"`);
-        
-        // Step 2: Get all OOPOS products
         const ooposResponse = await joolanService.getCatalogueWeb({ 'output-format': 'json' });
-        const ooposProducts = Array.isArray(ooposResponse) 
-            ? ooposResponse 
-            : Array.isArray(ooposResponse?.data) 
-                ? ooposResponse.data 
+        const ooposProducts = Array.isArray(ooposResponse)
+            ? ooposResponse
+            : Array.isArray(ooposResponse?.data)
+                ? ooposResponse.data
                 : [];
-        
-        console.log(`[getProductsByCategoryId] Total OOPOS products: ${ooposProducts.length}`);
-        
-        // Step 3: Normalize category name for comparison
-        const normalize = (str: string) => {
-            return (str || '')
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]/g, '')
-                .replace(/\d+$/, '');
-        };
-        
-        const categoryNameNormalized = category.name.trim().toUpperCase();
-        console.log(`[getProductsByCategoryId] Normalized category name: "${categoryNameNormalized}"`);
-        
-        // Step 4: Filter products by category (Rayon) and active status
-        const productsMap = new Map();
-        let filteredCount = 0;
-        
-        for (const product of ooposProducts) {
-            const rayonRaw = (product.Rayon || product.rayon || '').trim();
-            const rayon = rayonRaw.toUpperCase();
-            
-            // Filter by Rayon matching exactly the category name case-insensitive
-            if (rayonRaw && rayon === categoryNameNormalized) {
 
-                // Filter inactive products unless showAll is set
+        const categoryName = category.name.trim().toUpperCase();
+        // depth: 0 = Rayon (top), 1 = Famille, 2 = SousFamille
+        const depth = (category.parentIds || []).length;
+        const productsMap = new Map();
+
+        for (const product of ooposProducts) {
+            const rayon = (product.Rayon || product.rayon || '').trim().toUpperCase();
+            const famille = (product.Famille || product.famille || '').trim().toUpperCase();
+            const sousFamille = (product.SousFamille || product.sousFamille || '').trim().toUpperCase();
+
+            const matches =
+                depth === 0 ? rayon === categoryName :
+                depth === 1 ? famille === categoryName :
+                              sousFamille === categoryName;
+
+            if (matches) {
                 if (!showAll && !isActif(product)) continue;
 
-                filteredCount++;
                 const code = product.Produit || product.produit || product.Code || product.code;
                 const size = product.Taille || product.taille;
                 const color = product.Couleur || product.couleur;
-                
+
                 if (code) {
                     if (!productsMap.has(code)) {
                         productsMap.set(code, {
@@ -77,7 +114,7 @@ export const getProductsByCategoryId = async (categoryId: string, showAll: boole
                             discount: product.Remise_Vente || product.remise_vente || 0,
                             categoryId: category.id,
                             categoryName: category.name,
-                            rayon: rayonRaw || 'Non classé',
+                            rayon: (product.Rayon || product.rayon || 'Non classé').trim(),
                             famille: product.Famille || product.famille || '',
                             sousFamille: product.SousFamille || product.sousFamille || '',
                             marque: product.Marque || product.marque || '',
@@ -89,7 +126,7 @@ export const getProductsByCategoryId = async (categoryId: string, showAll: boole
                             actif: isActif(product) ? 1 : 0,
                             photo1: product.Photo1 || product.photo1 || '',
                             photo2: product.Photo2 || product.photo2 || '',
-                            images: [product.Photo1 || product.photo1, product.Photo2 || product.photo2].filter(Boolean),
+                            images: buildOoposImages(product),
                             sizes: [],
                             colors: [],
                             variants: []
@@ -112,12 +149,15 @@ export const getProductsByCategoryId = async (categoryId: string, showAll: boole
             }
         }
         
-        console.log(`[getProductsByCategoryId] OOPOS filtered by Rayon='${category.name}': ${filteredCount} products`);
-        console.log(`[getProductsByCategoryId] Unique products (by code): ${productsMap.size}`);
-        
         const products = Array.from(productsMap.values());
-        console.log(`[getProductsByCategoryId] Returning ${products.length} unique products`);
-        
+
+        // Fetch POS photos in parallel for products with no web catalog photos
+        await Promise.all(products.map(async (p: any) => {
+            if (p.images.length === 0 && p.code) {
+                p.images = await joolanService.getProductPosPhotos(p.code, p.sku);
+            }
+        }));
+
         return products;
         
     } catch (error: any) {
@@ -202,7 +242,7 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
             ean: p.EAN || p.ean || ''
         }));
 
-        return {
+        const result: any = {
             id: `oopos-${code}`,
             code: code,
             name: baseProduct.Designation || baseProduct.designation || '',
@@ -220,11 +260,17 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
             actif: isActif(baseProduct) ? 1 : 0,
             photo1: baseProduct.Photo1 || baseProduct.photo1 || '',
             photo2: baseProduct.Photo2 || baseProduct.photo2 || '',
-            images: [baseProduct.Photo1 || baseProduct.photo1, baseProduct.Photo2 || baseProduct.photo2].filter(Boolean),
+            images: buildOoposImages(baseProduct),
             sizes,
             colors,
             variants
         };
+
+        if (result.images.length === 0 && result.code) {
+            result.images = await joolanService.getProductPosPhotos(result.code, result.sku);
+        }
+
+        return result;
     } catch (error: any) {
         console.error('[getProductByCode] Error:', error.message);
         throw error;
@@ -343,14 +389,19 @@ async function ensureUniqueSlug(base: string, excludeId?: string): Promise<strin
 
 export const getProductById = async (id: string) => {
     if (id.startsWith('oopos-')) {
-        const code = id.replace('oopos-', '');
+        const code = id.replace('oopos-', '').replace(/~/g, '/');
         return await getProductByCode(code);
     }
 
-    const product = await Product.findByPk(id, {
-        include: [variantInclude, itemInclude],
-    });
-    if (product) return product;
+    // UUID lookup
+    if (isUUID(id)) {
+        const product = await Product.findByPk(id, { include: [variantInclude, itemInclude] });
+        if (product) return product;
+    }
+
+    // Slug lookup (local products)
+    const bySlug = await Product.findOne({ where: { slug: id }, include: [variantInclude, itemInclude] });
+    if (bySlug) return bySlug;
 
     // Fallback: try as OOPOS code
     try {

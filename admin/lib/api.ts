@@ -181,7 +181,7 @@ export const fetchUsers = async (): Promise<UserWithStats[]> => {
 
 // ─── Commandes (Admin) ────────────────────────────────────────────────────────
 
-export type CommandeStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+export type CommandeStatus = 'pending' | 'preconfirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
 
 export interface CommandeItemType {
   id: string;

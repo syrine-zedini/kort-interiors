@@ -23,6 +23,7 @@ interface ProductAttributes {
     isDetailsEnabled?: boolean;
     styles?: string[];
     variants?: ProductVariant[];
+    visible?: boolean;
 }
 
 interface ProductCreationAttributes extends Optional<ProductAttributes, 'id'> { }
@@ -46,6 +47,7 @@ export class Product extends Model<ProductAttributes, ProductCreationAttributes>
     declare isDetailsEnabled?: boolean;
     declare styles?: string[];
     declare variants?: ProductVariant[];
+    declare visible?: boolean;
 
     declare getVariants: HasManyGetAssociationsMixin<ProductVariant>;
 }
@@ -78,6 +80,7 @@ Product.init(
         details: { type: DataTypes.JSONB, allowNull: true },
         isDetailsEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
         styles: { type: DataTypes.ARRAY(DataTypes.UUID), allowNull: true },
+        visible: { type: DataTypes.BOOLEAN, defaultValue: false, allowNull: false },
     },
     {
         sequelize,

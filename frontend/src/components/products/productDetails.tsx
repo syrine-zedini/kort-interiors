@@ -120,10 +120,35 @@ const generateColorHex = (colorName: string): string => {
         "multicolore": "linear-gradient(135deg, #f00, #0f0, #00f)",
     };
 
+    if (!colorName || colorName === "." || colorName.trim() === "") return "#d1d5db";
+
     const normalized = colorName.toLowerCase().trim()
         .normalize("NFD").replace(/[̀-ͯ]/g, ""); // strip accents for fallback
     const normalizedWithAccents = colorName.toLowerCase().trim();
-    return colorMap[normalizedWithAccents] ?? colorMap[normalized] ?? "#d1d5db";
+    if (colorMap[normalizedWithAccents]) return colorMap[normalizedWithAccents];
+    if (colorMap[normalized]) return colorMap[normalized];
+
+    // Keyword-based fallback for pattern/motif names
+    const up = colorName.toUpperCase();
+    if (/AZUR|MARIN|HORIZON|OCEAN|NEBULA|FLUX|LIANO/.test(up)) return "#5B9BD5";
+    if (/JUNGLE|VERDA|FEUILLAGE|FORET|PALMIER|TROPICAL|HERBA/.test(up)) return "#5C9E6A";
+    if (/FLAMME|TERRA|ROUILLE|CORAIL|TULIPA|TAROKO/.test(up)) return "#D9603B";
+    if (/SABLE|DUNE|NUBE|SOUL|TRAME/.test(up)) return "#C8A97E";
+    if (/PINK|PETAL|FLORINA|PASTELA|ORNELLA/.test(up)) return "#E8839F";
+    if (/BLOOM|FLORA|FLORAISON|FLOREX|SYLVA|SYLORA/.test(up)) return "#B5785C";
+    if (/NOIR|SHADOW|OMBRE/.test(up)) return "#3A3A3A";
+    if (/OR|GOLD|SOLAIRE|PRISME/.test(up)) return "#C9A84C";
+    if (/VERT|SAUGE|OLIVE|SAFARI/.test(up)) return "#7A9E6E";
+
+    // Deterministic pastel color from name hash (unique per pattern)
+    let hash = 0;
+    for (let i = 0; i < colorName.length; i++) {
+        hash = colorName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = Math.abs(hash) % 360;
+    const s = 35 + (Math.abs(hash >> 8) % 25);
+    const l = 52 + (Math.abs(hash >> 16) % 20);
+    return `hsl(${h}, ${s}%, ${l}%)`;
 };
 
 
@@ -1135,11 +1160,17 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                             {/* Add to cart button */}
                             <button
                                 onClick={async () => {
+                                    if (visibleSizes.length > 0 && !effectiveSelectedSize) {
+                                        setToastMessage('✕ Veuillez sélectionner une taille');
+                                        setShowToast(true);
+                                        setTimeout(() => setShowToast(false), 3000);
+                                        return;
+                                    }
                                     try {
                                         await addToCart(
                                             product.id,
                                             quantity,
-                                            selectedVariant?.size,
+                                            selectedVariant?.size || effectiveSelectedSize,
                                             selectedColorId || selectedVariant?.color,
                                             undefined,
                                             selectedMaterial

@@ -14,10 +14,38 @@ import {
     updateProductVariant,
     deleteProductVariant,
     getCategoryVariants,
+    getLocalCategoryVariants,
 } from "../services/product.service";
-import { getMagasinsDisponibles } from "../services/joolan.service";
+import { getSiteSettings } from "../config/siteSettings";
+import { getMagasinsDisponibles, getProductPosPhotos, setProductPosPhotos } from "../services/joolan.service";
+import { ProductCategory } from "../models/product_categories.model";
+import { isUUID } from "../helpers/slug";
 
 const router = Router();
+
+// GET  /products/oopos-photos/:code  — retourne les URLs stockées pour ce produit
+router.get('/oopos-photos/:code', async (req, res) => {
+    try {
+        const code = decodeURIComponent(req.params.code);
+        const urls = await getProductPosPhotos(code);
+        res.json({ product_code: code, photo_urls: urls });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT  /products/oopos-photos/:code  — body: { photo_urls: ["url1", "url2"] }
+router.put('/oopos-photos/:code', async (req, res) => {
+    try {
+        const code = decodeURIComponent(req.params.code);
+        const { photo_urls } = req.body;
+        if (!Array.isArray(photo_urls)) return res.status(400).json({ error: 'photo_urls must be an array' });
+        await setProductPosPhotos(code, photo_urls);
+        res.json({ success: true, product_code: code, photo_urls });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 /**
  * @swagger
@@ -364,7 +392,24 @@ router.delete("/:id", async (req, res) => {
 router.get("/category/:categoryId", async (req, res) => {
     try {
         const { categoryId } = req.params;
-        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
+        const { productSource } = getSiteSettings();
+
+        if (isUUID(categoryId)) {
+            // UUID always means a truly local category
+            const products = await getLocalCategoryVariants(categoryId);
+            return res.json(products);
+        }
+
+        if (productSource !== 'oopos') {
+            // Local/hybrid mode: also check slug in local DB
+            const localCat = await ProductCategory.findOne({ where: { slug: categoryId } as any });
+            if (localCat) {
+                const products = await getLocalCategoryVariants(categoryId);
+                return res.json(products);
+            }
+        }
+
+        const showAll = req.query.showAll !== 'false';
         const products = await getProductsByCategoryId(categoryId, showAll);
         res.json(products);
     } catch (err: any) {
@@ -392,7 +437,30 @@ router.get("/category/:categoryId", async (req, res) => {
 router.get("/category/:categoryId/variants", async (req, res) => {
     try {
         const { categoryId } = req.params;
-        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
+        const { productSource } = getSiteSettings();
+
+        // If source is local, always use local DB
+        if (productSource === 'local') {
+            const products = await getLocalCategoryVariants(categoryId);
+            return res.json(products);
+        }
+
+        if (isUUID(categoryId)) {
+            // UUID always means a truly local category
+            const products = await getLocalCategoryVariants(categoryId);
+            return res.json(products);
+        }
+
+        // In OOPOS mode: slug-based IDs go directly to OOPOS
+        if (productSource !== 'oopos') {
+            const localCat = await ProductCategory.findOne({ where: { slug: categoryId } as any });
+            if (localCat) {
+                const products = await getLocalCategoryVariants(categoryId);
+                return res.json(products);
+            }
+        }
+
+        const showAll = req.query.showAll !== 'false';
         const products = await getCategoryVariants(categoryId, showAll);
         res.json(products);
     } catch (err: any) {

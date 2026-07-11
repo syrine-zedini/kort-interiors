@@ -9,7 +9,7 @@ import {
   CommandeType,
   CommandeStatus,
 } from "@/lib/api";
-import { exportTickets, annulerTicket, fetchTicketPdf } from "@/lib/ooposts-api";
+import { exportTickets, annulerTicket, fetchTicketPdf, fetchOoposTicketStatuses, updateOoposTicketStatus } from "@/lib/ooposts-api";
 import { ShoppingCart, ChevronDown, Check, X, MapPin, Search, ChevronLeft, ChevronRight, Ban, FileText } from "lucide-react";
 import { toast } from "sonner";
 import ApiResultPanel from "@/components/ui/ApiResultPanel";
@@ -19,6 +19,7 @@ const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "";
 const STATUS_OPTIONS: { value: CommandeStatus | "all"; label: string }[] = [
   { value: "all", label: "Tous" },
   { value: "pending", label: "En attente" },
+  { value: "preconfirmed", label: "Préconfirmée" },
   { value: "processing", label: "Confirmée" },
   { value: "shipped", label: "Expédiée" },
   { value: "delivered", label: "Livrée" },
@@ -27,6 +28,7 @@ const STATUS_OPTIONS: { value: CommandeStatus | "all"; label: string }[] = [
 
 const STATUS_LABELS: Record<CommandeStatus, string> = {
   pending: "En attente",
+  preconfirmed: "Préconfirmée",
   processing: "Confirmée",
   shipped: "Expédiée",
   delivered: "Livrée",
@@ -35,6 +37,7 @@ const STATUS_LABELS: Record<CommandeStatus, string> = {
 
 const STATUS_STYLES: Record<CommandeStatus, string> = {
   pending: "bg-yellow-100 text-yellow-700",
+  preconfirmed: "bg-orange-100 text-orange-700",
   processing: "bg-blue-100 text-blue-700",
   shipped: "bg-violet-100 text-violet-700",
   delivered: "bg-emerald-100 text-emerald-700",
@@ -66,7 +69,7 @@ export default function CommandesPage() {
   const [statusFilter, setStatusFilter] = useState<CommandeStatus | "all">("all");
   const [selectedCommande, setSelectedCommande] = useState<CommandeType | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [useOopos, setUseOopos] = useState(false);
+  const [useOopos, setUseOopos] = useState(true);
   const [ticketDate, setTicketDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [cancelTicketEntete, setCancelTicketEntete] = useState<string | null>(null);
   const [cancelMotif, setCancelMotif] = useState("");
@@ -87,7 +90,47 @@ export default function CommandesPage() {
     enabled: useOopos,
   });
 
-  const ooposTickets: OoposTicket[] = Array.isArray(ooposTicketsResponse?.data?.entetes) ? ooposTicketsResponse.data.entetes : Array.isArray(ooposTicketsResponse?.data) ? ooposTicketsResponse.data : [];
+  const { data: ooposStatuses = {}, refetch: refetchStatuses } = useQuery<Record<string, string>>({
+    queryKey: ["oopos-ticket-statuses", ticketDate],
+    queryFn: () => fetchOoposTicketStatuses(ticketDate),
+    enabled: useOopos,
+  });
+
+  const [updatingEntete, setUpdatingEntete] = useState<string | null>(null);
+
+  const handleOoposStatusUpdate = async (entete: string, status: string) => {
+    setUpdatingEntete(entete);
+    try {
+      await updateOoposTicketStatus(entete, status, ticketDate);
+      await refetchStatuses();
+      if (status === 'cancelled') {
+        toast.success("Ticket annulé");
+      } else if (status === 'preconfirmed') {
+        toast.success("Ticket préconfirmé");
+      } else if (status === 'confirmed') {
+        toast.success("Ticket confirmé");
+      }
+    } catch {
+      toast.error("Erreur lors de la mise à jour du statut");
+    } finally {
+      setUpdatingEntete(null);
+    }
+  };
+
+  const ooposTickets: OoposTicket[] = (() => {
+    const entetes: any[] = Array.isArray(ooposTicketsResponse?.data?.entetes)
+      ? ooposTicketsResponse.data.entetes
+      : Array.isArray(ooposTicketsResponse?.data)
+      ? ooposTicketsResponse.data
+      : [];
+    const lignes: any[] = Array.isArray(ooposTicketsResponse?.data?.lignes) ? ooposTicketsResponse.data.lignes : [];
+    const reglements: any[] = Array.isArray(ooposTicketsResponse?.data?.reglements) ? ooposTicketsResponse.data.reglements : [];
+    return entetes.map((e) => ({
+      ...e,
+      Lignes: lignes.filter((l) => l.Entete === e.Entete),
+      Reglements: reglements.filter((r) => r.Entete === e.Entete),
+    }));
+  })();
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: CommandeStatus }) =>
@@ -114,7 +157,9 @@ export default function CommandesPage() {
     try {
       const res = await annulerTicket(cancelTicketEntete, cancelMotif);
       setOoposActionResult({ action: "annulation-ticket", entete: cancelTicketEntete, motif: cancelMotif, response: res });
-      toast.success("Ticket annulé sur Oopus");
+      await updateOoposTicketStatus(cancelTicketEntete, "cancelled", ticketDate);
+      await refetchStatuses();
+      toast.success("Ticket annulé sur OOPOS");
       qc.invalidateQueries({ queryKey: ["oopos-tickets"] });
       setCancelTicketEntete(null);
     } catch (e: any) {
@@ -198,7 +243,7 @@ export default function CommandesPage() {
            </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          {/* <button
             onClick={() => { setUseOopos(!useOopos); setCurrentPage(1); setSearch(""); }}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               useOopos
@@ -207,7 +252,7 @@ export default function CommandesPage() {
             }`}
           >
             {useOopos ? "Voir e-commerce locales" : "Voir tickets OOPOS"}
-          </button>
+          </button> */}
           <span className="text-sm text-gray-500">
             {filtered.length} {useOopos ? "Ticket(s)" : "Commande(s)"}
           </span>
@@ -287,9 +332,9 @@ export default function CommandesPage() {
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         {/* Table header */}
-        <div className={`grid ${useOopos ? "grid-cols-[1fr_2fr_1fr_1fr_1fr]" : "grid-cols-[2fr_2fr_1fr_1.5fr_1.5fr_1.5fr_1fr]"} gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50`}>
+        <div className={`grid ${useOopos ? "grid-cols-[1fr_2fr_1fr_1fr_1fr_1fr]" : "grid-cols-[2fr_2fr_1fr_1.5fr_1.5fr_1.5fr_1fr]"} gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50`}>
           {useOopos ? (
-             ["MAGASIN & CAISSE", "LIGNES", "VENDEUR", "TOTAL", "ACTIONS"].map((h) => (
+             ["MAGASIN & CAISSE", "LIGNES", "VENDEUR", "TOTAL", "STATUT", "ACTIONS"].map((h) => (
                <span key={h} className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                  {h}
                </span>
@@ -310,8 +355,29 @@ export default function CommandesPage() {
         ) : (
           <div className="divide-y divide-gray-100">
             {useOopos ? (
-               (paginatedData as OoposTicket[]).map((ticket, idx: number) => (
-                  <div key={idx} className="grid grid-cols-[1fr_2fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center hover:bg-gray-50 transition-colors">
+               (paginatedData as OoposTicket[]).map((ticket, idx: number) => {
+                  const enteteStr = String(ticket.Entete || "");
+                  const localStatus = ooposStatuses[enteteStr] ?? "pending";
+                  const isUpdating = updatingEntete === enteteStr;
+                  const total = ticket.Reglements && ticket.Reglements.length > 0
+                    ? ticket.Reglements.reduce((acc: number, r) => acc + (r.Montant || 0), 0).toFixed(2) + " DT"
+                    : "—";
+
+                  const statusBadge: Record<string, string> = {
+                    pending: "bg-yellow-100 text-yellow-700",
+                    preconfirmed: "bg-orange-100 text-orange-700",
+                    confirmed: "bg-blue-100 text-blue-700",
+                    cancelled: "bg-red-100 text-red-600",
+                  };
+                  const statusLabel: Record<string, string> = {
+                    pending: "En attente",
+                    preconfirmed: "Préconfirmé",
+                    confirmed: "Confirmé",
+                    cancelled: "Annulé",
+                  };
+
+                  return (
+                  <div key={idx} className="grid grid-cols-[1fr_2fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center hover:bg-gray-50 transition-colors">
                      <div>
                         <p className="font-semibold text-gray-900">{ticket.Magasin}</p>
                         <p className="text-xs text-gray-500">Caisse {ticket.Caisse}</p>
@@ -326,21 +392,51 @@ export default function CommandesPage() {
                         )}
                      </div>
                      <div className="text-sm font-medium text-gray-700">{ticket.Vendeur || "—"}</div>
-                     <div className="text-sm font-bold text-gray-900">
-                        {ticket.Reglements && ticket.Reglements.length > 0
-                           ? ticket.Reglements.reduce((acc: number, r) => acc + (r.Montant || 0), 0).toFixed(2) + " DT"
-                           : "—"}
+                     <div className="text-sm font-bold text-gray-900">{total}</div>
+
+                     {/* Statut badge */}
+                     <div>
+                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusBadge[localStatus] ?? "bg-gray-100 text-gray-600"}`}>
+                         {statusLabel[localStatus] ?? localStatus}
+                       </span>
                      </div>
-                     <div className="flex gap-2">
-                        <button onClick={() => handleDownloadPdf(String(ticket.Entete || "1"))} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="PDF">
-                           <FileText size={18} />
-                        </button>
-                        <button onClick={() => handleCancelTicketClick(String(ticket.Entete || "1"))} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Annuler">
-                           <Ban size={18} />
-                        </button>
+
+                     {/* Actions */}
+                     <div className="flex gap-1.5 flex-wrap items-center">
+                       {localStatus === "pending" && (
+                         <>
+                           <button
+                             onClick={() => handleOoposStatusUpdate(enteteStr, "preconfirmed")}
+                             disabled={isUpdating}
+                             className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-100 text-orange-700 hover:bg-orange-200 transition disabled:opacity-50"
+                           >
+                             Préconfirmer
+                           </button>
+                           <button
+                             onClick={() => handleCancelTicketClick(enteteStr)}
+                             disabled={isUpdating}
+                             className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-100 text-red-600 hover:bg-red-200 transition disabled:opacity-50"
+                           >
+                             Annuler
+                           </button>
+                         </>
+                       )}
+                       {localStatus === "preconfirmed" && (
+                         <button
+                           onClick={() => handleOoposStatusUpdate(enteteStr, "confirmed")}
+                           disabled={isUpdating}
+                           className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition disabled:opacity-50"
+                         >
+                           Confirmer
+                         </button>
+                       )}
+                       <button onClick={() => handleDownloadPdf(enteteStr)} className="p-1.5 text-blue-400 hover:bg-blue-50 rounded" title="PDF">
+                         <FileText size={16} />
+                       </button>
                      </div>
                   </div>
-               ))
+                  );
+               })
             ) : (
               (paginatedData as CommandeType[]).map((commande) => {
                 const itemCount = commande.items?.length ?? 0;
@@ -427,24 +523,38 @@ export default function CommandesPage() {
                     })}
                   </div>
 
-                  {/* Status changer */}
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={commande.status}
-                      onChange={(e) =>
-                        updateStatus.mutate({
-                          id: commande.id,
-                          status: e.target.value as CommandeStatus,
-                        })
-                      }
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-300 cursor-pointer w-full"
-                    >
-                      {STATUS_OPTIONS.filter((o) => o.value !== "all").map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                  {/* Action buttons */}
+                  <div className="flex gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                    {commande.status === "pending" && (
+                      <>
+                        <button
+                          onClick={() => updateStatus.mutate({ id: commande.id, status: "preconfirmed" })}
+                          disabled={updateStatus.isPending}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-100 text-orange-700 hover:bg-orange-200 transition disabled:opacity-50"
+                        >
+                          Préconfirmer
+                        </button>
+                        <button
+                          onClick={() => updateStatus.mutate({ id: commande.id, status: "cancelled" })}
+                          disabled={updateStatus.isPending}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-100 text-red-600 hover:bg-red-200 transition disabled:opacity-50"
+                        >
+                          Annuler
+                        </button>
+                      </>
+                    )}
+                    {commande.status === "preconfirmed" && (
+                      <button
+                        onClick={() => updateStatus.mutate({ id: commande.id, status: "processing" })}
+                        disabled={updateStatus.isPending}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition disabled:opacity-50"
+                      >
+                        Confirmer
+                      </button>
+                    )}
+                    {!["pending", "preconfirmed"].includes(commande.status) && (
+                      <span className="text-xs text-gray-400 italic">—</span>
+                    )}
                   </div>
                 </div>
               );

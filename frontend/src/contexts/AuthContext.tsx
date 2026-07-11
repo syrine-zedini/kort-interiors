@@ -24,20 +24,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Decode user payload from JWT (no signature validation — just reads the claims)
+  const decodeJwt = (token: string): User | null => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.id) return null;
+      return { id: payload.id, username: payload.username || payload.email || 'Utilisateur', email: payload.email || '', role: payload.role };
+    } catch {
+      return null;
+    }
+  };
+
   // Check for existing session on mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userStr = localStorage.getItem("user");
 
-    if (token && userStr) {
-      try {
-        const userData = JSON.parse(userStr);
+    if (token) {
+      let userData: User | null = null;
+
+      // Try localStorage user JSON first
+      if (userStr) {
+        try {
+          userData = JSON.parse(userStr);
+        } catch {
+          localStorage.removeItem("user");
+        }
+      }
+
+      // Fallback: decode from JWT payload
+      if (!userData) {
+        userData = decodeJwt(token);
+        if (userData) {
+          localStorage.setItem("user", JSON.stringify(userData));
+        } else {
+          // Token malformed — clear everything
+          localStorage.removeItem("token");
+        }
+      }
+
+      if (userData) {
         setUser(userData);
         setIsAuthenticated(true);
-      } catch (err) {
-        console.error("Error parsing user data:", err);
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
       }
     }
     setIsLoading(false);
@@ -49,18 +77,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const token = localStorage.getItem("token");
       const userStr = localStorage.getItem("user");
 
-      if (token && userStr) {
-        try {
-          const userData = JSON.parse(userStr);
+      if (token) {
+        let userData: User | null = null;
+        if (userStr) {
+          try { userData = JSON.parse(userStr); } catch { /* ignore */ }
+        }
+        if (!userData) userData = decodeJwt(token);
+        if (userData) {
           setUser(userData);
           setIsAuthenticated(true);
-        } catch (err) {
-          console.error("Error parsing user data:", err);
+          return;
         }
-      } else {
-        setUser(null);
-        setIsAuthenticated(false);
       }
+      setUser(null);
+      setIsAuthenticated(false);
     };
 
     window.addEventListener("authStateChanged", handleAuthChange);

@@ -1,15 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import { adminAuth } from '../middleware/adminAuth';
 
 const execAsync = promisify(exec);
 const router = Router();
 
 const INSTAGRAM_HANDLE = 'kort.interiors';
 const SCRAPECREATORS_KEY = process.env.SCRAPECREATORS_API_KEY ?? '';
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 heure
+// Cache fichier : survive aux redémarrages du serveur
+const CACHE_FILE = path.join(process.cwd(), 'data', 'instagram_cache.json');
+// Rafraîchissement automatique toutes les 7 jours (1 crédit / semaine = ~25 mois gratuits)
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/* Post normalisé retourné au frontend */
 interface InstagramPost {
   id: string;
   media_url: string;
@@ -25,65 +30,95 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
-let cache: CacheEntry | null = null;
+function readCache(): CacheEntry | null {
+  try {
+    const raw = fs.readFileSync(CACHE_FILE, 'utf-8');
+    return JSON.parse(raw);
+  } catch { return null; }
+}
 
-/**
- * GET /api/v1/social/instagram
- * Retourne 5 posts récents via ScrapeCreators (profil public, pas de token Meta requis).
- * Utilise curl pour contourner le TLS fingerprinting du VPS.
- */
+function writeCache(entry: CacheEntry) {
+  try {
+    const dir = path.dirname(CACHE_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(entry));
+  } catch {}
+}
+
+async function fetchFromScrapeCreators(): Promise<InstagramPost[]> {
+  const url = `https://api.scrapecreators.com/v2/instagram/user/posts?handle=${INSTAGRAM_HANDLE}`;
+  const { stdout } = await execAsync(
+    `curl -s --max-time 15 -H "x-api-key: ${SCRAPECREATORS_KEY}" "${url}"`
+  );
+  const json = JSON.parse(stdout) as any;
+
+  if (json?.success === false) throw new Error(json.message);
+
+  const raw: any[] =
+    Array.isArray(json?.collector)   ? json.collector :
+    Array.isArray(json?.data?.items) ? json.data.items :
+    Array.isArray(json?.items)       ? json.items :
+    Array.isArray(json?.data)        ? json.data :
+    [];
+
+  return raw
+    .filter((p: any) => p.media_type !== 2)
+    .slice(0, 6)
+    .map((p: any) => {
+      const code = p.code ?? p.shortcode ?? null;
+      return {
+        id: String(p.id ?? p.pk ?? ''),
+        media_url: p.image_versions2?.candidates?.[0]?.url ?? p.display_url ?? p.thumbnail_url ?? '',
+        thumbnail_url: p.image_versions2?.candidates?.[1]?.url ?? undefined,
+        permalink: code ? `https://www.instagram.com/p/${code}/` : `https://www.instagram.com/${INSTAGRAM_HANDLE}/`,
+        caption: p.caption?.text ?? p.caption ?? undefined,
+        media_type: p.media_type === 8 ? 'CAROUSEL_ALBUM' : 'IMAGE',
+        timestamp: p.taken_at ? new Date(p.taken_at * 1000).toISOString() : new Date().toISOString(),
+      };
+    });
+}
+
+/* ── Public: frontend ─────────────────────────────────────── */
+
 router.get('/instagram', async (_req: Request, res: Response) => {
-  const apiKey = SCRAPECREATORS_KEY;
+  const cached = readCache();
 
-  if (!apiKey) {
-    return res.status(503).json({ message: 'SCRAPECREATORS_API_KEY non configuré.' });
+  // Retourner le cache s'il est encore valide
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return res.json({ data: cached.data, cached: true });
   }
 
-  /* Retourner le cache si encore valide */
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return res.json({ data: cache.data, cached: true });
+  // Pas de clé → retourner le cache périmé ou vide
+  if (!SCRAPECREATORS_KEY) {
+    return res.json({ data: cached?.data ?? [] });
   }
 
   try {
-    const url = `https://api.scrapecreators.com/v2/instagram/user/posts?handle=${INSTAGRAM_HANDLE}`;
-
-    const { stdout } = await execAsync(
-      `curl -s --max-time 15 -H "x-api-key: ${apiKey}" "${url}"`
-    );
-
-    const json = JSON.parse(stdout) as { data?: { items?: any[] }; items?: any[] };
-
-    /* ScrapeCreators v2 retourne data.items ou items selon la version */
-    const raw: any[] = json?.data?.items ?? json?.items ?? [];
-
-    /* Prendre les 6 posts les plus récents directement dans l'ordre chronologique */
-    const posts: InstagramPost[] = raw
-      .filter((p: any) => p.media_type !== 2)
-      .slice(0, 6)
-      .map((p: any) => ({
-        id: String(p.id ?? p.pk ?? ''),
-        media_url: p.image_versions2?.candidates?.[0]?.url
-          ?? p.display_url
-          ?? p.thumbnail_url
-          ?? '',
-        thumbnail_url: p.image_versions2?.candidates?.[1]?.url ?? undefined,
-        permalink: p.code
-          ? `https://www.instagram.com/p/${p.code}/`
-          : `https://www.instagram.com/${INSTAGRAM_HANDLE}/`,
-        caption: p.caption?.text ?? p.edge_media_to_caption?.edges?.[0]?.node?.text ?? undefined,
-        media_type: p.media_type === 8 ? 'CAROUSEL_ALBUM' : 'IMAGE',
-        timestamp: p.taken_at
-          ? new Date(p.taken_at * 1000).toISOString()
-          : new Date().toISOString(),
-      }));
-
-    cache = { data: posts, fetchedAt: Date.now() };
-    return res.json({ data: posts, cached: false });
-
+    const posts = await fetchFromScrapeCreators();
+    if (posts.length > 0) {
+      const entry = { data: posts, fetchedAt: Date.now() };
+      writeCache(entry);
+      return res.json({ data: posts, cached: false });
+    }
+    return res.json({ data: cached?.data ?? [] });
   } catch (err: any) {
-    console.error('[ScrapeCreators error]', err.message);
-    if (cache) return res.json({ data: cache.data, cached: true, stale: true });
-    return res.status(500).json({ message: 'Erreur serveur.' });
+    console.error('[ScrapeCreators]', err.message);
+    // Retourner le cache périmé plutôt que rien
+    return res.json({ data: cached?.data ?? [] });
+  }
+});
+
+/* ── Admin: forcer un rafraîchissement manuel ─────────────── */
+
+router.post('/instagram/refresh', adminAuth, async (_req: Request, res: Response) => {
+  if (!SCRAPECREATORS_KEY) return res.status(503).json({ message: 'SCRAPECREATORS_API_KEY manquant' });
+  try {
+    const posts = await fetchFromScrapeCreators();
+    const entry = { data: posts, fetchedAt: Date.now() };
+    writeCache(entry);
+    return res.json({ message: `${posts.length} posts récupérés`, data: posts });
+  } catch (err: any) {
+    return res.status(500).json({ message: err.message });
   }
 });
 

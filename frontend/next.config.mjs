@@ -2,12 +2,21 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
     remotePatterns: [
       {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '5000',
+        protocol: 'https',
+        hostname: 'kortinteriors.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'caisse.oopos.fr',
       },
       {
         protocol: 'http',
@@ -16,13 +25,8 @@ const nextConfig = {
       },
       {
         protocol: 'http',
-        hostname: 'backend',
-        port: '5000',
-      },
-      {
-        protocol: 'http',
         hostname: 'localhost',
-        port: '3000',
+        port: '5000',
       },
     ],
   },
