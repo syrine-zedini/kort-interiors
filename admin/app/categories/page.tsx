@@ -495,7 +495,7 @@ export default function CategoriesPage() {
             ? <div className="p-10 text-center text-gray-400 text-sm">Chargement…</div>
             : ooposCategories.length === 0
             ? <div className="p-10 text-center text-gray-400 text-sm">Aucune catégorie OOPOS.</div>
-            : <OoposTree nodes={ooposCategories} />}
+            : <OoposTree nodes={ooposCategories.filter(c => (c.productCount ?? 0) > 0 || (c.children?.length ?? 0) > 0)} />}
         </div>
       )}
 
