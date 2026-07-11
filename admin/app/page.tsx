@@ -120,7 +120,8 @@ export default function DashboardPage() {
     queryKey: ["admin-collections"],
     queryFn: async () => { const { data } = await api.get("/categories"); return data; },
   });
-  const collections = (collectionsData?.data ?? []).filter((c: any) => c.parentIds?.length === 0);
+  const allRoots = (collectionsData?.data ?? []).filter((c: any) => c.parentIds?.length === 0);
+  const collections = allRoots.filter((c: any) => (c.productCount ?? 0) > 0);
 
   const totalCommandes = commandes.length;
   // Calculate total revenue from orders that are not cancelled
