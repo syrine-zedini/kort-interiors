@@ -500,11 +500,11 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
         } else {
             // Same product, just update color selection
             setSelectedColorId(colorId);
-            
-            // ✅ AJOUTÉ: Also update selectedVariant to match the new color
-            const matchingVariant = product.variants?.find((v) => 
-                v.color === colorId || v.color?.toLowerCase() === colorId.toLowerCase()
-            );
+
+            // Prefer variant with images for this color; fall back to any variant of that color
+            const matchingVariant =
+                product.variants?.find((v) => (v.color === colorId || v.color?.toLowerCase() === colorId.toLowerCase()) && (v.images?.length ?? 0) > 0)
+                ?? product.variants?.find((v) => v.color === colorId || v.color?.toLowerCase() === colorId.toLowerCase());
             if (matchingVariant) {
                 setSelectedVariant(matchingVariant);
             }
@@ -1147,9 +1147,21 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                                     const size = e.target.value;
                                     setSelectedSize(size);
                                     updateQueryParams({ size });
-                                    const v = product.variants?.find((v) => v.size === size && (v.colorData?.hex ?? v.color) === (selectedVariant?.colorData?.hex ?? selectedVariant?.color))
+                                    const currentColor = selectedColorId;
+                                    // Find variant matching size + current color
+                                    let v = product.variants?.find((v) => v.size === size && v.color === currentColor)
                                         ?? product.variants?.find((v) => v.size === size);
-                                    if (v) setSelectedVariant(v);
+                                    if (v) {
+                                        // If variant has no images, borrow images from same-color variant
+                                        if (!(v.images?.length) && currentColor) {
+                                            const colorImages = product.variants?.find(
+                                                (pv) => pv.color === currentColor && (pv.images?.length ?? 0) > 0
+                                            )?.images;
+                                            setSelectedVariant({ ...v, images: colorImages ?? [] } as any);
+                                        } else {
+                                            setSelectedVariant(v);
+                                        }
+                                    }
                                 }}
                                 style={{
                                     width: "100%",
