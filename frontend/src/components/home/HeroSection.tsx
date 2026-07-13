@@ -87,16 +87,18 @@ export default function HeroSection() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Use API slides or fallback to default slides
-  const slides = apiSlides.length > 0 ? apiSlides : fallbackSlides;
+  // Use API slides (only those with a real image); fallback only if API completely fails
+  const slidesWithImage = apiSlides.filter(
+    (s) => s.image && s.image !== "null" && s.image !== "undefined" && s.image.trim() !== ""
+  );
+  const slides = slidesWithImage.length > 0 ? slidesWithImage : apiSlides.length > 0 ? [] : fallbackSlides;
 
   const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "";
 
   // Format image URL to include API base if needed
-  const getImageUrl = (slide: HeroSlide, fallbackIndex: number): string => {
-    // Check for falsy values including string 'null' and 'undefined'
+  const getImageUrl = (slide: HeroSlide, _fallbackIndex: number): string => {
     if (!slide.image || slide.image === "null" || slide.image === "undefined" || slide.image.trim() === "") {
-      return backendImages[fallbackIndex % backendImages.length];
+      return "";
     }
     
     // If it's a frontend static asset (starts with /assets/), return as is
