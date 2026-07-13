@@ -274,7 +274,7 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
             }
         } catch {}
 
-        // Attach per-color images to each variant so the frontend can switch images on color selection
+        // Attach per-color images to variants; also create synthetic variants for SQL colors missing from catalogue-web
         try {
             const colorPhotos = await joolanService.getProductColorPhotos(result.code);
             if (Object.keys(colorPhotos).length > 0) {
@@ -282,6 +282,23 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
                     ...v,
                     images: colorPhotos[v.color] || [],
                 }));
+                // Add synthetic variants for colors with SQL photos not in catalogue-web
+                const existingColors = new Set(result.variants.map((v: any) => v.color));
+                for (const [color, images] of Object.entries(colorPhotos) as [string, string[]][]) {
+                    if (!existingColors.has(color) && images.length > 0) {
+                        result.variants.push({
+                            sku: '',
+                            size: result.sizes[0] || '',
+                            color,
+                            price: result.price,
+                            discount: result.discount,
+                            actif: 1,
+                            ean: '',
+                            images,
+                        });
+                        if (!result.colors.includes(color)) result.colors.push(color);
+                    }
+                }
             }
         } catch {}
 
