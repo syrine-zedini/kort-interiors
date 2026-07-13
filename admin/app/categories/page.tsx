@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Globe, Database, Pencil, Trash2, X, Check, RefreshCw, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Plus, Globe, Database, Pencil, Trash2, X, Check, RefreshCw, ChevronRight, Eye, EyeOff, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { fetchCategories, CategoryNode } from "@/lib/api";
 import api from "@/lib/axios";
 import Button from "@/components/ui/Button";
 
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").replace("/api/v1", "");
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface RawCat  { id: string; name: string; slug: string | null; visible?: boolean; }
+interface RawCat  { id: string; name: string; slug: string | null; visible?: boolean; banner?: string | null; }
 interface RawHier { parentId: string; childId: string; }
 
 interface TreeNode {
@@ -18,14 +20,15 @@ interface TreeNode {
   name: string;
   level: 0 | 1 | 2; // 0=Rayon, 1=Famille, 2=SousFamille
   visible?: boolean;
+  banner?: string | null;
   children: TreeNode[];
 }
 
 // ── Build tree ─────────────────────────────────────────────────────────────────
 
 function buildTree(cats: RawCat[], hier: RawHier[]): TreeNode[] {
-  const map = new Map<string, { id: string; name: string; visible?: boolean; children: string[] }>();
-  for (const c of cats) map.set(c.id, { id: c.id, name: c.name, visible: c.visible, children: [] });
+  const map = new Map<string, { id: string; name: string; visible?: boolean; banner?: string | null; children: string[] }>();
+  for (const c of cats) map.set(c.id, { id: c.id, name: c.name, visible: c.visible, banner: c.banner, children: [] });
 
   const childIds = new Set<string>();
   for (const h of hier) {
@@ -47,6 +50,7 @@ function buildTree(cats: RawCat[], hier: RawHier[]): TreeNode[] {
       name: raw.name,
       level,
       visible: raw.visible,
+      banner: raw.banner,
       children: raw.children
         .map((cid) => makeNode(cid, nextLevel, next))
         .filter(Boolean) as TreeNode[],
@@ -114,7 +118,7 @@ function OoposTree({ nodes, depth = 0 }: { nodes: CategoryNode[]; depth?: number
 // ── Local tree with CRUD ───────────────────────────────────────────────────────
 
 function LocalNode({
-  node, editId, editName, setEditId, setEditName, onSave, onDelete, onAddChild, onToggleVisible, saving, deleting,
+  node, editId, editName, setEditId, setEditName, onSave, onDelete, onAddChild, onToggleVisible, onBannerChange, saving, deleting, bannerUploading,
 }: {
   node: TreeNode;
   editId: string | null; editName: string;
@@ -122,9 +126,14 @@ function LocalNode({
   onSave: (id: string) => void; onDelete: (id: string, name: string) => void;
   onAddChild: (parentId: string, parentLevel: 0 | 1) => void;
   onToggleVisible: (id: string) => void;
-  saving: boolean; deleting: boolean;
+  onBannerChange: (id: string, file: File) => void;
+  saving: boolean; deleting: boolean; bannerUploading: boolean;
 }) {
   const cfg = LEVEL_COLORS[node.level];
+  const fileRef = useRef<HTMLInputElement>(null);
+  const bannerUrl = node.banner
+    ? (node.banner.startsWith("http") ? node.banner : `${API_BASE}${node.banner}`)
+    : null;
 
   return (
     <div>
@@ -181,6 +190,39 @@ function LocalNode({
                 {node.visible !== false ? <Eye size={12} /> : <EyeOff size={12} />}
                 {node.visible !== false ? "Visible" : "Masqué"}
               </button>
+              {/* Banner image upload (Rayon & Famille only) */}
+              {node.level < 2 && (
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onBannerChange(node.id, file);
+                      e.target.value = "";
+                    }}
+                  />
+                  {bannerUrl && (
+                    <img
+                      src={bannerUrl}
+                      alt=""
+                      className="w-9 h-6 object-cover rounded border border-gray-200"
+                      title="Bannière actuelle"
+                    />
+                  )}
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={bannerUploading}
+                    title={bannerUrl ? "Changer l'image bannière" : "Ajouter une image bannière"}
+                    className={`p-1.5 rounded-lg transition ${bannerUrl ? "text-violet-500 hover:bg-violet-50" : "text-gray-400 hover:text-violet-600 hover:bg-violet-50"}`}
+                  >
+                    {bannerUploading ? <RefreshCw size={13} className="animate-spin" /> : <ImageIcon size={13} />}
+                  </button>
+                </div>
+              )}
+
               {/* Edit / delete */}
               <div className="flex items-center gap-1">
                 {node.level < 2 && (
@@ -210,8 +252,8 @@ function LocalNode({
           editId={editId} editName={editName}
           setEditId={setEditId} setEditName={setEditName}
           onSave={onSave} onDelete={onDelete} onAddChild={onAddChild}
-          onToggleVisible={onToggleVisible}
-          saving={saving} deleting={deleting} />
+          onToggleVisible={onToggleVisible} onBannerChange={onBannerChange}
+          saving={saving} deleting={deleting} bannerUploading={bannerUploading} />
       ))}
     </div>
   );
@@ -430,6 +472,20 @@ export default function CategoriesPage() {
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Erreur de synchronisation"),
   });
 
+  const bannerMut = useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const form = new FormData();
+      form.append("file", file);
+      const { data: uploaded } = await api.post("/files", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const url: string = uploaded.data?.url ?? uploaded.url ?? "";
+      await api.put(`/categories/${id}`, { banner: url });
+    },
+    onSuccess: () => { invalidateLocal(); toast.success("Image bannière mise à jour"); },
+    onError: () => toast.error("Erreur lors de l'upload de l'image"),
+  });
+
   const handleDelete = (id: string, name: string) =>
     toast(`Supprimer "${name}" ?`, {
       action: { label: "Confirmer", onClick: () => deleteMut.mutate(id) },
@@ -523,8 +579,10 @@ export default function CategoriesPage() {
                 onDelete={handleDelete}
                 onAddChild={handleAddChild}
                 onToggleVisible={(id) => visibilityMut.mutate(id)}
+                onBannerChange={(id, file) => bannerMut.mutate({ id, file })}
                 saving={updateMut.isPending}
                 deleting={deleteMut.isPending}
+                bannerUploading={bannerMut.isPending}
               />
             ))
           }
