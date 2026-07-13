@@ -70,6 +70,9 @@ function countNodes(nodes: TreeNode[]): number {
   return nodes.reduce((n, node) => n + 1 + countNodes(node.children), 0);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isOrphan = (node: TreeNode) => UUID_RE.test(node.name);
+
 // ── Level config ───────────────────────────────────────────────────────────────
 
 const LEVEL_LABELS = ["Rayon", "Famille", "SousFamille"];
@@ -431,8 +434,9 @@ export default function CategoriesPage() {
   });
 
   const localTree = useMemo(() => buildTree(catsRaw, hierRaw), [catsRaw, hierRaw]);
+  const visibleTree = useMemo(() => localTree.filter((n) => !isOrphan(n)), [localTree]);
   const localLoading = catsLoading || hierLoading;
-  const localTotal = useMemo(() => countNodes(localTree), [localTree]);
+  const localTotal = useMemo(() => countNodes(visibleTree), [visibleTree]);
 
   const invalidateLocal = () => {
     qc.invalidateQueries({ queryKey: ["local-cats-raw"] });
@@ -571,7 +575,7 @@ export default function CategoriesPage() {
                 </button>
               </div>
             )
-            : localTree.map((rayon) => (
+            : visibleTree.map((rayon) => (
               <LocalNode key={rayon.id} node={rayon}
                 editId={editId} editName={editName}
                 setEditId={setEditId} setEditName={setEditName}
@@ -592,7 +596,7 @@ export default function CategoriesPage() {
       {/* Add modal */}
       {addModal.open && (
         <AddModal
-          tree={localTree}
+          tree={visibleTree}
           parentId={addModal.parentId}
           parentLevel={addModal.parentLevel}
           onClose={() => setAddModal({ open: false, parentId: null, parentLevel: null })}
