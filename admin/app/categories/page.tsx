@@ -529,9 +529,22 @@ export default function CategoriesPage() {
           </div>
 
           {source === "local" && (
-            <Button onClick={() => setAddModal({ open: true, parentId: null, parentLevel: null })}>
-              <Plus size={15} /> Ajouter
-            </Button>
+            <>
+              <button
+                onClick={() => {
+                  if (!confirm("Ceci va effacer et réimporter toutes les catégories depuis OOPOS. Continuer ?")) return;
+                  syncMut.mutate();
+                }}
+                disabled={syncMut.isPending}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition"
+              >
+                {syncMut.isPending ? <RefreshCw size={15} className="animate-spin" /> : <Globe size={15} />}
+                {syncMut.isPending ? "Import…" : "Sync OOPOS"}
+              </button>
+              <Button onClick={() => setAddModal({ open: true, parentId: null, parentLevel: null })}>
+                <Plus size={15} /> Ajouter
+              </Button>
+            </>
           )}
         </div>
       </div>
