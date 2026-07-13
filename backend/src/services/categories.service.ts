@@ -404,17 +404,18 @@ export async function renameCategory(id: string, newName: string) {
     return category;
 }
 
-export async function updateCategoryBanner(slug: string, banner: string | null | undefined) {
-    // Categories come from OOPOS — banners are stored locally keyed by slug
-    let record = await ProductCategory.findOne({ where: { slug } });
+export async function updateCategoryBanner(idOrSlug: string, banner: string | null | undefined) {
+    // Try by UUID first (admin sends UUID), then by slug (OOPOS flow sends slug)
+    let record: any = await ProductCategory.findByPk(idOrSlug);
+    if (!record) record = await ProductCategory.findOne({ where: { slug: idOrSlug } });
     if (!record) {
-        // Create a local record just to hold the banner
-        record = await ProductCategory.create({ name: slug, slug, banner: banner ?? null } as any);
+        // OOPOS-only fallback: create a local record keyed by slug to hold the banner
+        record = await ProductCategory.create({ name: idOrSlug, slug: idOrSlug, banner: banner ?? null } as any);
     } else {
-        (record as any).banner = banner ?? null;
+        record.banner = banner ?? null;
         await record.save();
     }
-    return { slug, banner: banner ?? null };
+    return { id: record.id, slug: record.slug, banner: banner ?? null };
 }
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
