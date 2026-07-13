@@ -291,3 +291,35 @@ export const setProductPosPhotos = async (productCode: string, photoUrls: string
     await OoposProductPhoto.upsert({ product_code: productCode, photo_urls: photoUrls });
     _photoCache.set(productCode, { urls: photoUrls, ts: Date.now() });
 };
+
+// Returns a map of color → photo URLs from produits_couleurs table
+export const getProductColorPhotos = async (productCode: string): Promise<{ [color: string]: string[] }> => {
+    if (!isQueryAvailable()) return {};
+    const esc = productCode.replace(/'/g, "''");
+    const safeQuery = async (sql: string) => {
+        try { return await runQuery(sql, {}); }
+        catch (err: any) {
+            if (err?.response?.status === 503 || err?.code === 'ECONNRESET' || err?.message?.includes('socket hang up')) {
+                tripQueryCircuit();
+            }
+            return null;
+        }
+    };
+    const res = await safeQuery(
+        `SELECT Couleur, Photo1, Photo2, Photo3, Photo4, Photo5, Photo6, Photo7, Photo8 FROM produits_couleurs WHERE Produit = '${esc}'`
+    );
+    if (res?.result === 'ok' && Array.isArray(res?.data)) {
+        const map: { [color: string]: string[] } = {};
+        for (const row of res.data) {
+            const color = row.Couleur || row.couleur;
+            if (!color) continue;
+            const photos = ['Photo1','Photo2','Photo3','Photo4','Photo5','Photo6','Photo7','Photo8']
+                .map((k: string) => row[k])
+                .filter((v: any) => v && String(v).length > 8)
+                .map((h: any) => buildCdnUrl(String(h)));
+            if (photos.length) map[color] = photos;
+        }
+        return map;
+    }
+    return {};
+};

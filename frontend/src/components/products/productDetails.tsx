@@ -200,6 +200,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
 
     React.useEffect(() => {
         setMainImage(resolveImg(displayImages[0]));
+        setCurrentImageIndex(0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedVariant, product.id]);
 
