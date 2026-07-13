@@ -108,6 +108,16 @@ const generateColorHex = (colorName: string): string => {
         "lin": "#E8D5B7",
         "sable": "#D4B896",
         "angora": "#E8D5C4",
+        // OOPOS-specific colors
+        "canard": "#006D6F",
+        "crepuscule": "#6B4E8C",
+        "glacier": "#B0CDE0",
+        "lagon": "#00A8A8",
+        "mint": "#98D5B5",
+        "gris souris": "#9E9E9E",
+        "rose fume": "#C5908E",
+        "titane": "#878681",
+        "uni bleu": "#4169E1",
         // Violets / Lilas / Lavande
         "violet": "#800080",
         "mauve": "#E0B0FF",
@@ -127,6 +137,13 @@ const generateColorHex = (colorName: string): string => {
     const normalizedWithAccents = colorName.toLowerCase().trim();
     if (colorMap[normalizedWithAccents]) return colorMap[normalizedWithAccents];
     if (colorMap[normalized]) return colorMap[normalized];
+
+    // Strip trailing digits (OOPOS codes like "BLANC35809" → "blanc", "GRIS SOURIS42" → "gris souris")
+    const withoutSuffix = normalized.replace(/\d+$/, "").trim();
+    if (colorMap[withoutSuffix]) return colorMap[withoutSuffix];
+    // Try first word only ("gris souris" → "gris")
+    const firstWord = withoutSuffix.split(" ")[0];
+    if (firstWord && colorMap[firstWord]) return colorMap[firstWord];
 
     // Keyword-based fallback for pattern/motif names
     const up = colorName.toUpperCase();
