@@ -81,17 +81,17 @@ export default function HeroSection() {
   const [swiperInstance, setSwiperInstance] = useState<SwiperType | null>(null);
 
   // Fetch hero slides from API
-  const { data: apiSlides = [] } = useQuery({
+  const { data: apiSlides = [], isLoading: slidesLoading } = useQuery({
     queryKey: ["heroSlides"],
     queryFn: fetchHeroSlides,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Use API slides (only those with a real image); fallback only if API completely fails
+  // Only show slides with a real image; show nothing while loading
   const slidesWithImage = apiSlides.filter(
     (s) => s.image && s.image !== "null" && s.image !== "undefined" && s.image.trim() !== ""
   );
-  const slides = slidesWithImage.length > 0 ? slidesWithImage : apiSlides.length > 0 ? [] : fallbackSlides;
+  const slides = slidesLoading ? [] : slidesWithImage;
 
   const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "";
 
