@@ -108,7 +108,12 @@ const generateColorHex = (colorName: string): string => {
         "lin": "#E8D5B7",
         "sable": "#D4B896",
         "angora": "#E8D5C4",
-        // OOPOS-specific colors
+        // OOPOS-specific colors & materials
+        "stanless steel": "#A8A9AD",
+        "stainless steel": "#A8A9AD",
+        "inox": "#A8A9AD",
+        "acier": "#A8A9AD",
+        "chrome": "#C0C0C0",
         "canard": "#006D6F",
         "crepuscule": "#6B4E8C",
         "glacier": "#B0CDE0",
@@ -296,20 +301,8 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
 
     const colorMap = useMemo(() => allColors, [allColors]);
 
-    // Colors that have at least one photo attached (from OOPOS per-color images)
-    const colorsWithImages = useMemo(() => {
-        const set = new Set<string>();
-        (product.variants ?? []).forEach((v: any) => {
-            if (v.color && v.images?.length > 0) set.add(v.color);
-        });
-        return set;
-    }, [product.variants]);
-    const hasAnyColorImages = colorsWithImages.size > 0;
-
     // ✅ CORRECTION: Map color names to hex values
-    // If any variant has images, only show colors that have photos
     const colorOptions = Array.from(new Set<string>(rawColorIds))
-    .filter((colorName) => !hasAnyColorImages || colorsWithImages.has(colorName))
     .map((colorName: string) => {
         // First try to find in allColors (UUID-based)
         const meta = colorMap[colorName];
