@@ -274,6 +274,18 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
             }
         } catch {}
 
+        // Build details table from OOPOS fields
+        const detailRows: { key: string; value: string }[] = [];
+        if (result.famille)    detailRows.push({ key: 'Catégorie',  value: result.famille });
+        if (result.sousFamille) detailRows.push({ key: 'Sous-catégorie', value: result.sousFamille });
+        if (result.marque)     detailRows.push({ key: 'Marque',     value: result.marque });
+        if (result.saison)     detailRows.push({ key: 'Collection', value: result.saison });
+        if (result.fournisseur) detailRows.push({ key: 'Fournisseur', value: result.fournisseur });
+        if (result.poids && result.poids > 0) detailRows.push({ key: 'Poids', value: `${result.poids} kg` });
+        if (result.ean)        detailRows.push({ key: 'EAN',        value: result.ean });
+        result.details = detailRows;
+        result.isDetailsEnabled = detailRows.length > 0;
+
         return result;
     } catch (error: any) {
         console.error('[getProductByCode] Error:', error.message);
