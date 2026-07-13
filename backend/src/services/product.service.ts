@@ -275,6 +275,7 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
         } catch {}
 
         // Build details table from OOPOS fields
+        console.log(`[getProductByCode DEBUG] code=${code} famille=${JSON.stringify(result.famille)} marque=${JSON.stringify(result.marque)} saison=${JSON.stringify(result.saison)} ean=${JSON.stringify(result.ean)}`);
         const detailRows: { key: string; value: string }[] = [];
         if (result.famille)    detailRows.push({ key: 'Catégorie',  value: result.famille });
         if (result.sousFamille) detailRows.push({ key: 'Sous-catégorie', value: result.sousFamille });
