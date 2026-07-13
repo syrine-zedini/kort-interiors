@@ -113,7 +113,6 @@ const generateColorHex = (colorName: string): string => {
         "stainless steel": "#A8A9AD",
         "inox": "#A8A9AD",
         "acier": "#A8A9AD",
-        "chrome": "#C0C0C0",
         "canard": "#006D6F",
         "crepuscule": "#6B4E8C",
         "glacier": "#B0CDE0",
@@ -301,10 +300,21 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
 
     const colorMap = useMemo(() => allColors, [allColors]);
 
-    // ✅ CORRECTION: Map color names to hex values
+    // Build set of colors that have images attached (from produits_couleurs SQL via backend)
+    const colorsWithImages = useMemo(() => {
+        const s = new Set<string>();
+        (relatedProducts.length > 0 ? relatedProducts : [product]).forEach((p) => {
+            (p.variants ?? []).forEach((v: any) => {
+                if (v.color && v.images && v.images.length > 0) s.add(v.color);
+            });
+        });
+        return s;
+    }, [relatedProducts, product]);
+
+    // Only show colors that have photos; if none have photos, show all
     const colorOptions = Array.from(new Set<string>(rawColorIds))
+    .filter((colorName) => colorsWithImages.size === 0 || colorsWithImages.has(colorName))
     .map((colorName: string) => {
-        // First try to find in allColors (UUID-based)
         const meta = colorMap[colorName];
         if (meta) {
             return {
@@ -313,11 +323,10 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                 label: meta.nameFr,
             };
         }
-        // If not found, treat colorName as a string and generate hex
         return {
             key: colorName,
             hex: generateColorHex(colorName),
-            label: colorName, // Use the color name directly as label
+            label: colorName,
         };
     });
     const materials = product.sizeMaterialPricingWithPromotion?.[effectiveSelectedSize]
