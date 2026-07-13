@@ -279,8 +279,21 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
 
     const colorMap = useMemo(() => allColors, [allColors]);
 
+    // Colors that have at least one photo attached (from OOPOS per-color images)
+    const colorsWithImages = useMemo(() => {
+        const set = new Set<string>();
+        (product.variants ?? []).forEach((v: any) => {
+            if (v.color && v.images?.length > 0) set.add(v.color);
+        });
+        return set;
+    }, [product.variants]);
+    const hasAnyColorImages = colorsWithImages.size > 0;
+
     // ✅ CORRECTION: Map color names to hex values
-    const colorOptions = Array.from(new Set<string>(rawColorIds)).map((colorName: string) => {
+    // If any variant has images, only show colors that have photos
+    const colorOptions = Array.from(new Set<string>(rawColorIds))
+    .filter((colorName) => !hasAnyColorImages || colorsWithImages.has(colorName))
+    .map((colorName: string) => {
         // First try to find in allColors (UUID-based)
         const meta = colorMap[colorName];
         if (meta) {
