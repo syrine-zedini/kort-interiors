@@ -97,9 +97,10 @@ const generateColorHex = (colorName: string): string => {
         "ocre": "#CC7722",
         "moutarde": "#C8A415",
         // Bruns / Camel / Taupe
-        "marron": "#A52A2A",
+        "marron": "#6F4E37",
+        "marron fonce": "#3D2B1F",
         "chocolat": "#7B3F00",
-        "brun": "#964B00",
+        "brun": "#795548",
         "camel": "#C19A6B",
         "caramel": "#C68E5B",
         "noisette": "#9C6B30",
@@ -108,6 +109,8 @@ const generateColorHex = (colorName: string): string => {
         "lin": "#E8D5B7",
         "sable": "#D4B896",
         "angora": "#E8D5C4",
+        "naturel": "#D2B48C",
+        "terre": "#8B5E3C",
         // OOPOS-specific colors & materials
         "stanless steel": "#A8A9AD",
         "stainless steel": "#A8A9AD",
