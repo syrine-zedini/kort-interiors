@@ -329,6 +329,22 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
             label: colorName,
         };
     });
+
+    // If current selectedColorId was filtered out (no images), auto-select the first color that has images
+    useEffect(() => {
+        if (colorsWithImages.size > 0 && !colorsWithImages.has(selectedColorId)) {
+            const firstColor = Array.from(colorsWithImages)[0];
+            setSelectedColorId(firstColor);
+            const allVariants = (relatedProducts.length > 0 ? relatedProducts : [product])
+                .flatMap((p: any) => p.variants ?? []);
+            const matchingVariant = allVariants.find(
+                (v: any) => v.color === firstColor && v.images?.length > 0
+            );
+            if (matchingVariant) setSelectedVariant(matchingVariant as any);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [colorsWithImages]);
+
     const materials = product.sizeMaterialPricingWithPromotion?.[effectiveSelectedSize]
         ? Object.keys(product.sizeMaterialPricingWithPromotion[effectiveSelectedSize])
         : (product.sizeMaterialPricing?.[effectiveSelectedSize]
