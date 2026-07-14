@@ -292,26 +292,44 @@ export const setProductPosPhotos = async (productCode: string, photoUrls: string
     _photoCache.set(productCode, { urls: photoUrls, ts: Date.now() });
 };
 
+// Separate circuit breaker for color queries — shorter TTL so a getProductPosPhotos failure
+// doesn't block color photo lookups for the full 10 minutes.
+let _colorCircuitOpen = false;
+let _colorCircuitOpenedAt = 0;
+const COLOR_CIRCUIT_TTL = 2 * 60 * 1000; // 2 minutes
+
 // Returns a map of color → photo URLs from produits_couleurs table
 export const getProductColorPhotos = async (productCode: string): Promise<{ [color: string]: string[] }> => {
-    if (!isQueryAvailable()) return {};
-    const esc = productCode.replace(/'/g, "''");
+    const colorCircuitOk = !_colorCircuitOpen || Date.now() - _colorCircuitOpenedAt > COLOR_CIRCUIT_TTL;
+    if (_colorCircuitOpen && colorCircuitOk) _colorCircuitOpen = false;
+    console.log(`[getProductColorPhotos] productCode="${productCode}" globalCircuit=${_queryCircuitOpen} colorCircuit=${_colorCircuitOpen}`);
+    if (_colorCircuitOpen) {
+        console.log(`[getProductColorPhotos] color circuit open, skipping`);
+        return {};
+    }
+    const esc = productCode.trim().replace(/'/g, "''");
     const safeQuery = async (sql: string) => {
         try { return await runQuery(sql, {}); }
         catch (err: any) {
+            console.error(`[getProductColorPhotos] SQL error: msg="${err?.message}" code=${err?.code} status=${err?.response?.status}`);
             if (err?.response?.status === 503 || err?.code === 'ECONNRESET' || err?.message?.includes('socket hang up')) {
+                _colorCircuitOpen = true;
+                _colorCircuitOpenedAt = Date.now();
                 tripQueryCircuit();
             }
             return null;
         }
     };
+    // Use UPPER+TRIM to handle case and whitespace differences between catalogue-web and produits_couleurs
     const res = await safeQuery(
-        `SELECT Couleur, Photo1, Photo2, Photo3, Photo4, Photo5, Photo6, Photo7, Photo8 FROM produits_couleurs WHERE Produit = '${esc}'`
+        `SELECT Couleur, Photo1, Photo2, Photo3, Photo4, Photo5, Photo6, Photo7, Photo8 FROM produits_couleurs WHERE UPPER(TRIM(Produit)) = UPPER('${esc}')`
     );
+    console.log(`[getProductColorPhotos] SQL: result=${res?.result} rows=${Array.isArray(res?.data) ? res.data.length : 'n/a'} sample=${JSON.stringify(res?.data?.slice(0,2))}`);
     if (res?.result === 'ok' && Array.isArray(res?.data)) {
         const map: { [color: string]: string[] } = {};
         for (const row of res.data) {
-            const color = row.Couleur || row.couleur;
+            // Normalize color key to uppercase+trimmed so lookup is case-insensitive
+            const color = (row.Couleur || row.couleur || '').trim().toUpperCase();
             if (!color) continue;
             const photos = ['Photo1','Photo2','Photo3','Photo4','Photo5','Photo6','Photo7','Photo8']
                 .map((k: string) => row[k])
@@ -319,7 +337,9 @@ export const getProductColorPhotos = async (productCode: string): Promise<{ [col
                 .map((h: any) => buildCdnUrl(String(h)));
             if (photos.length) map[color] = photos;
         }
+        console.log(`[getProductColorPhotos] returning ${Object.keys(map).length} colors: ${Object.keys(map).join(', ')}`);
         return map;
     }
+    console.log(`[getProductColorPhotos] no matching data in produits_couleurs`);
     return {};
 };

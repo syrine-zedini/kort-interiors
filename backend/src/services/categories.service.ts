@@ -392,7 +392,7 @@ export async function createCategory(name: string, parentId?: string) {
 // ─── Update ───────────────────────────────────────────────────────────────────
 
 export async function renameCategory(id: string, newName: string) {
-    let category = await ProductCategory.findByPk(id);
+    let category = isUUID(id) ? await ProductCategory.findByPk(id) : null;
     if (!category) category = await ProductCategory.findOne({ where: { slug: id } });
     if (!category) throw new Error('Category not found');
 
@@ -405,8 +405,9 @@ export async function renameCategory(id: string, newName: string) {
 }
 
 export async function updateCategoryBanner(idOrSlug: string, banner: string | null | undefined) {
-    // Try by UUID first (admin sends UUID), then by slug (OOPOS flow sends slug)
-    let record: any = await ProductCategory.findByPk(idOrSlug);
+    // Only use findByPk when idOrSlug is a valid UUID — passing a slug to findByPk on
+    // a UUID-typed PK throws "invalid input syntax for type uuid" in PostgreSQL.
+    let record: any = isUUID(idOrSlug) ? await ProductCategory.findByPk(idOrSlug) : null;
     if (!record) record = await ProductCategory.findOne({ where: { slug: idOrSlug } });
     if (!record) {
         // OOPOS-only fallback: create a local record keyed by slug to hold the banner
@@ -425,7 +426,7 @@ export async function deleteCategory(
     moveProductsTo: string | null = null,
     deleteChildren: boolean = false
 ) {
-    let category = await ProductCategory.findByPk(id);
+    let category = isUUID(id) ? await ProductCategory.findByPk(id) : null;
     if (!category) category = await ProductCategory.findOne({ where: { slug: id } });
     if (!category) throw new Error('Category not found');
 

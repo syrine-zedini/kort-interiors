@@ -277,13 +277,14 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
         // Attach per-color images to variants; also create synthetic variants for SQL colors missing from catalogue-web
         try {
             const colorPhotos = await joolanService.getProductColorPhotos(result.code);
+            console.log(`[getProductByCode] code="${result.code}" colorPhotos=${JSON.stringify(Object.keys(colorPhotos))}`);
             if (Object.keys(colorPhotos).length > 0) {
-                result.variants = result.variants.map((v: any) => ({
-                    ...v,
-                    images: colorPhotos[v.color] || [],
-                }));
+                result.variants = result.variants.map((v: any) => {
+                    const colorKey = (v.color || '').toUpperCase().trim();
+                    return { ...v, images: colorPhotos[colorKey] || [] };
+                });
                 // Add synthetic variants for colors with SQL photos not in catalogue-web
-                const existingColors = new Set(result.variants.map((v: any) => v.color));
+                const existingColors = new Set(result.variants.map((v: any) => (v.color || '').toUpperCase().trim()));
                 for (const [color, images] of Object.entries(colorPhotos) as [string, string[]][]) {
                     if (!existingColors.has(color) && images.length > 0) {
                         result.variants.push({
