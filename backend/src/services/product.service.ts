@@ -6,6 +6,7 @@ import { ProductCategory } from '../models/product_categories.model';
 import { generateSlug, isUUID } from '../helpers/slug';
 import * as joolanService from "./joolan.service";
 import { getCategoryById } from "./categories.service";
+import { getSiteSettings } from "../config/siteSettings";
 
 /** Returns all products from a local PostgreSQL category in the same shape as OOPOS. */
 export const getLocalCategoryVariants = async (categoryId: string) => {
@@ -303,15 +304,13 @@ export const getProductByCode = async (code: string, showAll: boolean = false) =
             }
         } catch {}
 
-        // Build details table from OOPOS fields
+        // Build details table from OOPOS fields (internal-only fields like Fournisseur and EAN are excluded)
         const detailRows: { key: string; value: string }[] = [];
-        if (result.famille)    detailRows.push({ key: 'Catégorie',  value: result.famille });
+        if (result.famille)     detailRows.push({ key: 'Catégorie',      value: result.famille });
         if (result.sousFamille) detailRows.push({ key: 'Sous-catégorie', value: result.sousFamille });
-        if (result.marque)     detailRows.push({ key: 'Marque',     value: result.marque });
-        if (result.saison)     detailRows.push({ key: 'Collection', value: result.saison });
-        if (result.fournisseur) detailRows.push({ key: 'Fournisseur', value: result.fournisseur });
+        if (result.marque)      detailRows.push({ key: 'Marque',         value: result.marque });
+        if (result.saison)      detailRows.push({ key: 'Collection',     value: result.saison });
         if (result.poids && result.poids > 0) detailRows.push({ key: 'Poids', value: `${result.poids} kg` });
-        if (result.ean)        detailRows.push({ key: 'EAN',        value: result.ean });
         result.details = detailRows;
         result.isDetailsEnabled = detailRows.length > 0;
 
@@ -379,8 +378,8 @@ export const verifyEAN = async (ean: string) => {
  */
 export const getAllProducts = async (search?: string, filters?: { color?: string; size?: string; showAll?: boolean | string }) => {
     try {
+        // 1. Fetch matching local PostgreSQL products
         const where: any = {};
-
         if (search) {
             where[Op.or] = [
                 { name: { [Op.iLike]: `%${search}%` } },
@@ -388,7 +387,7 @@ export const getAllProducts = async (search?: string, filters?: { color?: string
             ];
         }
 
-        const products = await Product.findAll({
+        const localProducts = await Product.findAll({
             where,
             include: [
                 { model: ProductVariant, as: 'variants', required: false },
@@ -397,7 +396,100 @@ export const getAllProducts = async (search?: string, filters?: { color?: string
             order: [['createdAt', 'DESC']],
         });
 
-        return products;
+        // 2. Fetch and filter OOPOS products
+        let ooposProductsList: any[] = [];
+        try {
+            const ooposResponse = await joolanService.getCatalogueWeb({ 'output-format': 'json' });
+            const ooposRaw = Array.isArray(ooposResponse)
+                ? ooposResponse
+                : Array.isArray(ooposResponse?.data)
+                    ? ooposResponse.data
+                    : [];
+
+            const productsMap = new Map();
+            const showAll = filters?.showAll === true || filters?.showAll === 'true' || filters?.showAll === '1';
+
+            for (const product of ooposRaw) {
+                if (!showAll && !isActif(product)) continue;
+
+                const code = product.Produit || product.produit || product.Code || product.code;
+                const size = product.Taille || product.taille;
+                const color = product.Couleur || product.couleur;
+
+                if (code) {
+                    const name = product.Designation || product.designation || '';
+                    if (search) {
+                        const searchLower = search.toLowerCase();
+                        const codeMatch = String(code).toLowerCase().includes(searchLower);
+                        const nameMatch = String(name).toLowerCase().includes(searchLower);
+                        if (!codeMatch && !nameMatch) continue;
+                    }
+
+                    if (!productsMap.has(code)) {
+                        productsMap.set(code, {
+                            id: `oopos-${code}`,
+                            code: code,
+                            name: name,
+                            price: product.Prix_Vente || product.prix_vente || 0,
+                            discount: product.Remise_Vente || product.remise_vente || 0,
+                            rayon: (product.Rayon || product.rayon || 'Non classé').trim(),
+                            famille: product.Famille || product.famille || '',
+                            sousFamille: product.SousFamille || product.sousFamille || '',
+                            marque: product.Marque || product.marque || '',
+                            ean: product.EAN || product.ean || '',
+                            fournisseur: product.Fournisseur || product.fournisseur || '',
+                            sku: product.Sku || product.sku || '',
+                            saison: product.Saison || product.saison || '',
+                            poids: product.Poids || product.poids || 0,
+                            actif: isActif(product) ? 1 : 0,
+                            photo1: product.Photo1 || product.photo1 || '',
+                            photo2: product.Photo2 || product.photo2 || '',
+                            images: buildOoposImages(product),
+                            sizes: [],
+                            colors: [],
+                            variants: []
+                        });
+                    }
+
+                    const parent = productsMap.get(code);
+                    if (size && !parent.sizes.includes(size)) parent.sizes.push(size);
+                    if (color && !parent.colors.includes(color)) parent.colors.push(color);
+                    parent.variants.push({
+                        sku: product.Sku || product.sku || product.EAN || product.ean || '',
+                        size: size || '',
+                        color: color || '',
+                        price: product.Prix_Vente || product.prix_vente || 0,
+                        discount: product.Remise_Vente || product.remise_vente || 0,
+                        actif: isActif(product) ? 1 : 0,
+                        ean: product.EAN || product.ean || ''
+                    });
+                }
+            }
+
+            ooposProductsList = Array.from(productsMap.values());
+
+            // Optional filters on OOPOS
+            if (filters?.color) {
+                const colorFilter = filters.color.toLowerCase();
+                ooposProductsList = ooposProductsList.filter(p => p.colors.some((c: string) => c.toLowerCase() === colorFilter));
+            }
+            if (filters?.size) {
+                const sizeFilter = filters.size.toLowerCase();
+                ooposProductsList = ooposProductsList.filter(p => p.sizes.some((s: string) => s.toLowerCase() === sizeFilter));
+            }
+
+            // Fetch POS photos for matching OOPOS products in parallel
+            await Promise.all(ooposProductsList.map(async (p: any) => {
+                if (p.images.length === 0 && p.code) {
+                    p.images = await joolanService.getProductPosPhotos(p.code, p.sku);
+                }
+            }));
+        } catch (err: any) {
+            console.error('[getAllProducts] OOPOS search error:', err.message);
+        }
+
+        // Combine both local database and OOPOS products
+        return [...localProducts, ...ooposProductsList];
     } catch (error: any) {
         console.error('[getAllProducts] Error:', error.message);
         throw error;

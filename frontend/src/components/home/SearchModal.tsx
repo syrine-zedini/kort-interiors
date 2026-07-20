@@ -162,8 +162,8 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
               // We can use `/products/all/${product.slug || product.id}` or just rely on a search route.
               // Assuming there is a dynamic route `products/[categorySlug]/[productSlug].tsx`,
               // we can pass a dummy category like 'search' or 'all' if needed, or if the product has `category` we can use it.
-              // Since product doesn't include category slug by default, we can just use categoryId.
-              const linkUrl = `/products/search/${product.slug}`;
+              const productSlug = (product.slug || product.id || "").replace(/\//g, "~");
+              const linkUrl = `/products/search/${productSlug}`;
 
               return (
                 <Link
