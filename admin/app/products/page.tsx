@@ -96,7 +96,7 @@ export default function ProductsPage() {
       const nodes: { id: string; name: string; slug?: string; parentIds: string[] }[] = [];
       const flatten = (cats: any[], parentIds: string[] = []) => {
         for (const cat of cats) {
-          nodes.push({ id: String(cat.id), name: cat.name, slug: cat.slug, parentIds: cat.parentIds ?? parentIds });
+          nodes.push({ id: String(cat.id), name: cat.name, slug: cat.slug, parentIds: cat.parentIds || parentIds || [] });
           if (cat.children?.length) flatten(cat.children, [String(cat.id)]);
         }
       };
@@ -104,18 +104,18 @@ export default function ProductsPage() {
 
       const localList = Array.isArray(res2.data) ? res2.data : [];
       for (const loc of localList) {
-        nodes.push({ id: String(loc.id), name: loc.name, slug: loc.slug, parentIds: loc.parentIds ?? [] });
+        nodes.push({ id: String(loc.id), name: loc.name, slug: loc.slug, parentIds: loc.parentIds || [] });
       }
       return nodes;
     },
   });
 
-  const rayonIds = new Set(localCatsRaw.filter(c => c.parentIds.length === 0).map(c => c.id));
-  const familleIds = new Set(localCatsRaw.filter(c => c.parentIds.some(pid => rayonIds.has(pid))).map(c => c.id));
+  const rayonIds = new Set(localCatsRaw.filter(c => (c.parentIds || []).length === 0).map(c => c.id));
+  const familleIds = new Set(localCatsRaw.filter(c => (c.parentIds || []).some(pid => rayonIds.has(pid))).map(c => c.id));
   const catsByLevel = [
-    localCatsRaw.filter(c => c.parentIds.length === 0),
-    localCatsRaw.filter(c => c.parentIds.some(pid => rayonIds.has(pid))),
-    localCatsRaw.filter(c => !rayonIds.has(c.id) && !familleIds.has(c.id) && c.parentIds.length > 0),
+    localCatsRaw.filter(c => (c.parentIds || []).length === 0),
+    localCatsRaw.filter(c => (c.parentIds || []).some(pid => rayonIds.has(pid))),
+    localCatsRaw.filter(c => !rayonIds.has(c.id) && !familleIds.has(c.id) && (c.parentIds || []).length > 0),
   ];
   const catMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -470,9 +470,9 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs max-w-xs truncate">{p.description || "—"}</td>
                       <td className="px-4 py-3">
-                        {p.categoryId ? (
+                        {(p.categoryId || (p as any).category_id) ? (
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">
-                            {catMap.get(p.categoryId) ?? p.categoryId}
+                            {catMap.get(String(p.categoryId || (p as any).category_id)) ?? (p.categoryId || (p as any).category_id)}
                           </span>
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
