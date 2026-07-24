@@ -409,7 +409,7 @@ router.get("/category/:categoryId", async (req, res) => {
             }
         }
 
-        const showAll = req.query.showAll !== 'false';
+        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
         const products = await getProductsByCategoryId(categoryId, showAll);
         res.json(products);
     } catch (err: any) {
@@ -460,7 +460,7 @@ router.get("/category/:categoryId/variants", async (req, res) => {
             }
         }
 
-        const showAll = req.query.showAll !== 'false';
+        const showAll = req.query.showAll === 'true' || req.query.showAll === '1';
         const products = await getCategoryVariants(categoryId, showAll);
         res.json(products);
     } catch (err: any) {

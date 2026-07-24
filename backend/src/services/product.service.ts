@@ -152,14 +152,55 @@ export const getProductsByCategoryId = async (categoryId: string, showAll: boole
         
         const products = Array.from(productsMap.values());
 
-        // Fetch POS photos in parallel for products with no web catalog photos
-        await Promise.all(products.map(async (p: any) => {
-            if (p.images.length === 0 && p.code) {
-                p.images = await joolanService.getProductPosPhotos(p.code, p.sku);
-            }
-        }));
+        // Fetch local PostgreSQL products assigned to this category
+        let localProductsFormatted: any[] = [];
+        try {
+            const localCat = isUUID(categoryId)
+                ? await ProductCategory.findByPk(categoryId)
+                : await ProductCategory.findOne({ where: { slug: categoryId } as any });
+            
+            const targetCatId = localCat ? String(localCat.id) : categoryId;
+            const whereClause: any = showAll ? { categoryId: targetCatId } : { categoryId: targetCatId, visible: true };
+            
+            const localProds = await Product.findAll({
+                where: whereClause,
+                include: [{ model: ProductVariant, as: 'variants', required: false }],
+            });
 
-        return products;
+            const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? '';
+            localProductsFormatted = localProds.map((p: any) => ({
+                id: p.id,
+                code: p.code ?? '',
+                name: p.name ?? '',
+                description: p.description ?? '',
+                price: Number(p.price ?? 0),
+                discount: Number(p.discount ?? 0),
+                images: (p.images ?? []).map((img: string) =>
+                    img.startsWith('http') ? img : `${IMAGE_BASE}${img}`
+                ),
+                slug: p.slug ?? '',
+                categoryId: targetCatId,
+                categoryName: category?.name ?? '',
+                visible: p.visible,
+                actif: p.visible ? 1 : 0,
+                sizes: p.sizes || [],
+                colors: p.colors || [],
+                variants: (p.variants ?? []).map((v: any) => ({
+                    id: v.id,
+                    sku: v.sku ?? '',
+                    size: v.size ?? '',
+                    color: v.color ?? '',
+                    price: Number(v.price ?? p.price ?? 0),
+                    discount: Number(v.discount ?? 0),
+                    images: v.images ?? [],
+                    actif: 1
+                })),
+            }));
+        } catch (e: any) {
+            console.error('[getProductsByCategoryId] Error fetching local products:', e.message);
+        }
+
+        return [...localProductsFormatted, ...products];
         
     } catch (error: any) {
         console.error('[getProductsByCategoryId] Error:', error.message);
@@ -378,8 +419,11 @@ export const verifyEAN = async (ean: string) => {
  */
 export const getAllProducts = async (search?: string, filters?: { color?: string; size?: string; showAll?: boolean | string }) => {
     try {
-        // 1. Fetch matching local PostgreSQL products
+        const showAll = filters?.showAll === true || filters?.showAll === 'true' || filters?.showAll === '1';
         const where: any = {};
+        if (!showAll) {
+            where.visible = true;
+        }
         if (search) {
             where[Op.or] = [
                 { name: { [Op.iLike]: `%${search}%` } },

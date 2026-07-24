@@ -78,25 +78,34 @@ export default function ProductsPage() {
   // ── Local DB data ──
   const { data: localProducts = [], isLoading: localLoading } = useQuery({
     queryKey: ["local-products"],
-    queryFn: fetchProducts,
+    queryFn: async () => {
+      const { data } = await api.get('/db-viewer/products?limit=1000');
+      return data.rows;
+    },
     enabled: source === "local",
   });
 
-  // ── Categories for dropdown (OOPOS tree flattened) ──
-  const { data: localCatsRaw = [] } = useQuery<{ id: string; name: string; parentIds: string[] }[]>({
+  // ── Categories for dropdown & mapping ──
+  const { data: localCatsRaw = [] } = useQuery<{ id: string; name: string; slug?: string; parentIds: string[] }[]>({
     queryKey: ["all-categories-flat"],
     queryFn: async () => {
-      const { data } = await api.get("/categories");
-      const nodes: { id: string; name: string; parentIds: string[] }[] = [];
+      const [res1, res2] = await Promise.all([
+        api.get("/categories").catch(() => ({ data: { data: [] } })),
+        api.get("/db-viewer/local-categories").catch(() => ({ data: [] })),
+      ]);
+      const nodes: { id: string; name: string; slug?: string; parentIds: string[] }[] = [];
       const flatten = (cats: any[], parentIds: string[] = []) => {
         for (const cat of cats) {
-          if ((cat.productCount ?? 0) > 0 || (cat.children?.length ?? 0) > 0) {
-            nodes.push({ id: cat.id, name: cat.name, parentIds: cat.parentIds ?? parentIds });
-            if (cat.children?.length) flatten(cat.children, [cat.id]);
-          }
+          nodes.push({ id: String(cat.id), name: cat.name, slug: cat.slug, parentIds: cat.parentIds ?? parentIds });
+          if (cat.children?.length) flatten(cat.children, [String(cat.id)]);
         }
       };
-      flatten(data.data ?? []);
+      flatten(res1.data?.data ?? []);
+
+      const localList = Array.isArray(res2.data) ? res2.data : [];
+      for (const loc of localList) {
+        nodes.push({ id: String(loc.id), name: loc.name, slug: loc.slug, parentIds: loc.parentIds ?? [] });
+      }
       return nodes;
     },
   });
@@ -108,7 +117,14 @@ export default function ProductsPage() {
     localCatsRaw.filter(c => c.parentIds.some(pid => rayonIds.has(pid))),
     localCatsRaw.filter(c => !rayonIds.has(c.id) && !familleIds.has(c.id) && c.parentIds.length > 0),
   ];
-  const catMap = new Map(localCatsRaw.map(c => [c.id, c.name]));
+  const catMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of localCatsRaw) {
+      if (c.id) map.set(String(c.id), c.name);
+      if (c.slug) map.set(String(c.slug), c.name);
+    }
+    return map;
+  }, [localCatsRaw]);
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/db-viewer/local-products/${id}`),

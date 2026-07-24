@@ -86,6 +86,15 @@ router.post('/local-products', adminAuth, async (req, res) => {
   const { code, name, price, description, images, categoryId } = req.body;
   if (!code || !name || !price || !description || !categoryId) return res.status(400).json({ message: 'code, name, prix, description et catégorie sont requis' });
   try {
+    let finalCategoryId = categoryId || null;
+    if (finalCategoryId && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(finalCategoryId)) {
+      let cat = await ProductCategory.findOne({ where: { slug: finalCategoryId } });
+      if (!cat) {
+        cat = await ProductCategory.create({ name: finalCategoryId, slug: finalCategoryId } as any);
+      }
+      finalCategoryId = cat.id;
+    }
+
     const slug = `${generateSlug(name)}-${Date.now()}`;
     const product = await Product.create({
       code: String(code).trim(),
@@ -93,7 +102,7 @@ router.post('/local-products', adminAuth, async (req, res) => {
       price: price != null ? Number(price) : undefined,
       description: description ? String(description).trim() : undefined,
       images: Array.isArray(images) ? images : [],
-      categoryId: categoryId || null,
+      categoryId: finalCategoryId,
       slug,
       productType: 1,
     } as any);
@@ -109,10 +118,23 @@ router.put('/local-products/:id', adminAuth, async (req, res) => {
   const { code, name, price, description, images, categoryId } = req.body;
   if (name !== undefined) product.name = name;
   if (code !== undefined) product.code = code;
-  if (price !== undefined) product.price = Number(price);
+  if (price !== undefined) {
+    const parsedPrice = Number(price);
+    product.price = isNaN(parsedPrice) ? 0 : parsedPrice;
+  }
   if (description !== undefined) product.description = description;
   if (images !== undefined) product.images = images;
-  if (categoryId !== undefined) (product as any).categoryId = categoryId || null;
+  if (categoryId !== undefined) {
+    if (categoryId && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(categoryId)) {
+      let cat = await ProductCategory.findOne({ where: { slug: categoryId } });
+      if (!cat) {
+        cat = await ProductCategory.create({ name: categoryId, slug: categoryId } as any);
+      }
+      (product as any).categoryId = cat.id;
+    } else {
+      (product as any).categoryId = categoryId || null;
+    }
+  }
   await product.save();
   res.json(product);
 });

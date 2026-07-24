@@ -85,20 +85,24 @@ export default function ImageCropUploader({ value, onChange, label }: ImageCropU
     const img = imgRef.current;
     const scaleX = img.naturalWidth / img.width;
     const scaleY = img.naturalHeight / img.height;
+
+    const cropX = completedCrop.x * scaleX;
+    const cropY = completedCrop.y * scaleY;
+    const cropW = completedCrop.width * scaleX;
+    const cropH = completedCrop.height * scaleY;
+
+    // Set the canvas size to the exact natural crop dimensions to preserve 100% native resolution
     const canvas = document.createElement("canvas");
-    canvas.width = outputWidth;
-    canvas.height = outputHeight;
+    canvas.width = cropW;
+    canvas.height = cropH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
     try {
-      ctx.drawImage(
-        img,
-        completedCrop.x * scaleX,
-        completedCrop.y * scaleY,
-        completedCrop.width * scaleX,
-        completedCrop.height * scaleY,
-        0, 0, outputWidth, outputHeight
-      );
+      ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
     } catch (err) {
       console.error("Canvas draw error (CORS)", err);
       return;
@@ -121,8 +125,8 @@ export default function ImageCropUploader({ value, onChange, label }: ImageCropU
       } finally {
         setUploading(false);
       }
-    }, "image/jpeg", 0.95);
-  }, [completedCrop, outputWidth, outputHeight, onChange]);
+    }, "image/jpeg", 0.98);
+  }, [completedCrop, onChange]);
 
   const displaySrc = value
     ? value.startsWith("http") ? value : `${IMAGE_BASE}${value}`
@@ -233,7 +237,6 @@ export default function ImageCropUploader({ value, onChange, label }: ImageCropU
               />
             </ReactCrop>
           </div>
-
 
           {/* Boutons */}
           <div className="flex gap-3">
