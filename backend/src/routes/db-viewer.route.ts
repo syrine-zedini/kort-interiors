@@ -4,6 +4,8 @@ import { sequelize } from '../config/sequelize';
 import { adminAuth } from '../middleware/adminAuth';
 import { Product } from '../models/product.model';
 import { ProductCategory } from '../models/product_categories.model';
+import { ProductVariant } from '../models/product_variant';
+import { ProductItem } from '../models/product_item.model';
 import { generateSlug } from '../helpers/slug';
 import * as joolanService from '../services/joolan.service';
 
@@ -83,8 +85,11 @@ router.get('/:table', adminAuth, async (req, res) => {
 // ── Local Product CRUD (PostgreSQL only, no OOPOS) ──────────────────────────
 
 router.post('/local-products', adminAuth, async (req, res) => {
-  const { code, name, price, description, images, categoryId } = req.body;
-  if (!code || !name || !price || !description || !categoryId) return res.status(400).json({ message: 'code, name, prix, description et catégorie sont requis' });
+  const { 
+    code, name, price, description, images, categoryId, discount, colors, sizes, styles, visible,
+    details, isDetailsEnabled, manualVariants, sizePricing, sizeMaterialPricing, variants, items
+  } = req.body;
+  if (!code || !name || !description) return res.status(400).json({ message: 'code, name et description sont requis' });
   try {
     let finalCategoryId = categoryId || null;
     if (finalCategoryId && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(finalCategoryId)) {
@@ -100,12 +105,40 @@ router.post('/local-products', adminAuth, async (req, res) => {
       code: String(code).trim(),
       name: String(name).trim(),
       price: price != null ? Number(price) : undefined,
+      discount: discount != null ? Number(discount) : undefined,
       description: description ? String(description).trim() : undefined,
       images: Array.isArray(images) ? images : [],
+      colors: Array.isArray(colors) ? colors : [],
+      sizes: Array.isArray(sizes) ? sizes : [],
+      styles: Array.isArray(styles) ? styles : [],
+      visible: visible === true || visible === 'true',
       categoryId: finalCategoryId,
       slug,
       productType: 1,
+      details: Array.isArray(details) ? details : undefined,
+      isDetailsEnabled: Boolean(isDetailsEnabled),
+      manualVariants: Boolean(manualVariants),
+      sizeMaterialPricing: typeof sizeMaterialPricing === 'object' ? sizeMaterialPricing : undefined,
     } as any);
+
+    // Save variants if provided
+    if (Array.isArray(variants) && variants.length > 0) {
+      await ProductVariant.bulkCreate(variants.map(v => ({
+        ...v,
+        id: undefined,
+        productId: product.id,
+      })));
+    }
+
+    // Save items if provided
+    if (Array.isArray(items) && items.length > 0) {
+      await ProductItem.bulkCreate(items.map(i => ({
+        ...i,
+        id: undefined,
+        productId: product.id,
+      })));
+    }
+
     res.status(201).json(product);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -115,15 +148,23 @@ router.post('/local-products', adminAuth, async (req, res) => {
 router.put('/local-products/:id', adminAuth, async (req, res) => {
   const product = await Product.findByPk(String(req.params.id));
   if (!product) return res.status(404).json({ message: 'Produit introuvable' });
-  const { code, name, price, description, images, categoryId } = req.body;
+  const { code, name, price, description, images, categoryId, discount, colors, sizes, styles, visible } = req.body;
   if (name !== undefined) product.name = name;
   if (code !== undefined) product.code = code;
   if (price !== undefined) {
     const parsedPrice = Number(price);
     product.price = isNaN(parsedPrice) ? 0 : parsedPrice;
   }
+  if (discount !== undefined) {
+    const parsedDiscount = Number(discount);
+    product.discount = isNaN(parsedDiscount) ? 0 : parsedDiscount;
+  }
   if (description !== undefined) product.description = description;
   if (images !== undefined) product.images = images;
+  if (colors !== undefined) (product as any).colors = Array.isArray(colors) ? colors : [];
+  if (sizes !== undefined) (product as any).sizes = Array.isArray(sizes) ? sizes : [];
+  if (styles !== undefined) (product as any).styles = Array.isArray(styles) ? styles : [];
+  if (visible !== undefined) (product as any).visible = Boolean(visible);
   if (categoryId !== undefined) {
     if (categoryId && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(categoryId)) {
       let cat = await ProductCategory.findOne({ where: { slug: categoryId } });

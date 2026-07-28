@@ -339,13 +339,8 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
             )}
           </div>
 
-          {tab === "login" && (
-            <div style={{ textAlign: "right", marginTop: "-24px", marginBottom: "28px" }}>
-              <a href="#" style={{ fontSize: "11px", color: "#999", textDecoration: "none" }} className="auth-forgot">
-                Mot de passe oublié ?
-              </a>
-            </div>
-          )}
+
+
 
           <button
             type="submit"

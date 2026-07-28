@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchCategories } from "@/lib/api";
+import api from "@/lib/axios";
 import { CreateProductPayload, Product, VariantDraft } from "@/types/product";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
@@ -26,6 +27,13 @@ interface ProductFormProps {
 
 export default function ProductForm({ initial, onSubmit, loading }: ProductFormProps) {
   const { data: categoryGroups = [] } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
+  const { data: localCategoriesRaw = [] } = useQuery<{ id: string; name: string; slug?: string }[]>({
+    queryKey: ["local-categories-for-form"],
+    queryFn: async () => {
+      const { data } = await api.get("/db-viewer/local-categories");
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDesc] = useState(initial?.description ?? "");
@@ -184,7 +192,17 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
     }
     return options;
   }
-  const allCategories = flattenCats(categoryGroups);
+  const ooposOptions = flattenCats(categoryGroups);
+  const localCatOptions: CatOption[] = localCategoriesRaw.map((c) => ({
+    value: c.id,
+    label: `— ${c.name} (local)`,
+  }));
+  // Merge: OOPOS first, then local ones not already present
+  const seenValues = new Set(ooposOptions.map((o) => o.value));
+  const allCategories = [
+    ...ooposOptions,
+    ...localCatOptions.filter((o) => !seenValues.has(o.value)),
+  ];
 
   const normalizeSizeMaterialPricing = (
     source?: Record<string, Record<string, string | number>>

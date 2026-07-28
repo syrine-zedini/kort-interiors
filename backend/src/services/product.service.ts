@@ -702,6 +702,23 @@ export const updateProduct = async (id: string, data: any) => {
     if (data.productType !== undefined) product.productType = data.productType;
 
     await product.save();
+
+    // Sync variants if provided
+    if (data.variants !== undefined) {
+        await ProductVariant.destroy({ where: { productId: id } });
+        if (Array.isArray(data.variants) && data.variants.length > 0) {
+            await ProductVariant.bulkCreate(data.variants.map((v: any) => ({ ...v, id: undefined, productId: id })));
+        }
+    }
+
+    // Sync items if provided
+    if (data.items !== undefined) {
+        await ProductItem.destroy({ where: { productId: id } });
+        if (Array.isArray(data.items) && data.items.length > 0) {
+            await ProductItem.bulkCreate(data.items.map((i: any) => ({ ...i, id: undefined, productId: id })));
+        }
+    }
+
     return await Product.findByPk(id, { include: [variantInclude, itemInclude] });
 };
 
