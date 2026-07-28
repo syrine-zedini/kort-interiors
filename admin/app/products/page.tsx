@@ -127,7 +127,6 @@ export default function ProductsPage() {
       api.put(`/db-viewer/local-products/${id}`, { ...data, images: data.images }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["local-products"] });
-      setEditId(null);
       toast.success("Produit modifié");
     },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Erreur modification"),
