@@ -615,6 +615,7 @@ export default function CategoriesPage() {
                 onBannerChange={(id, file) => bannerMut.mutate({ id, file })}
                 onBannerDelete={(id) => deleteBannerMut.mutate(id)}
                 bannerUploading={bannerMut.isPending || deleteBannerMut.isPending}
+                saving={updateMut.isPending}
                 deleting={deleteMut.isPending}
               />
             ))
