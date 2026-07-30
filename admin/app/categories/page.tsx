@@ -121,7 +121,7 @@ function OoposTree({ nodes, depth = 0 }: { nodes: CategoryNode[]; depth?: number
 // ── Local tree with CRUD ───────────────────────────────────────────────────────
 
 function LocalNode({
-  node, editId, editName, setEditId, setEditName, onSave, onDelete, onAddChild, onToggleVisible, onBannerChange, saving, deleting, bannerUploading,
+  node, editId, editName, setEditId, setEditName, onSave, onDelete, onAddChild, onToggleVisible, onBannerChange, onBannerDelete, saving, deleting, bannerUploading,
 }: {
   node: TreeNode;
   editId: string | null; editName: string;
@@ -130,6 +130,7 @@ function LocalNode({
   onAddChild: (parentId: string, parentLevel: 0 | 1) => void;
   onToggleVisible: (id: string) => void;
   onBannerChange: (id: string, file: File) => void;
+  onBannerDelete: (id: string) => void;
   saving: boolean; deleting: boolean; bannerUploading: boolean;
 }) {
   const cfg = LEVEL_COLORS[node.level];
@@ -208,12 +209,21 @@ function LocalNode({
                     }}
                   />
                   {bannerUrl && (
-                    <img
-                      src={bannerUrl}
-                      alt=""
-                      className="w-9 h-6 object-cover rounded border border-gray-200"
-                      title="Bannière actuelle"
-                    />
+                    <div className="relative group">
+                      <img
+                        src={bannerUrl}
+                        alt=""
+                        className="w-9 h-6 object-cover rounded border border-gray-200"
+                        title="Bannière actuelle"
+                      />
+                      <button
+                        onClick={() => onBannerDelete(node.id)}
+                        className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition shadow"
+                        title="Supprimer la bannière"
+                      >
+                        <X size={8} />
+                      </button>
+                    </div>
                   )}
                   <button
                     onClick={() => fileRef.current?.click()}
@@ -255,7 +265,7 @@ function LocalNode({
           editId={editId} editName={editName}
           setEditId={setEditId} setEditName={setEditName}
           onSave={onSave} onDelete={onDelete} onAddChild={onAddChild}
-          onToggleVisible={onToggleVisible} onBannerChange={onBannerChange}
+          onToggleVisible={onToggleVisible} onBannerChange={onBannerChange} onBannerDelete={onBannerDelete}
           saving={saving} deleting={deleting} bannerUploading={bannerUploading} />
       ))}
     </div>
@@ -490,6 +500,12 @@ export default function CategoriesPage() {
     onError: () => toast.error("Erreur lors de l'upload de l'image"),
   });
 
+  const deleteBannerMut = useMutation({
+    mutationFn: (id: string) => api.put(`/categories/${id}`, { banner: null }),
+    onSuccess: () => { invalidateLocal(); toast.success("Image bannière supprimée"); },
+    onError: () => toast.error("Erreur lors de la suppression de l'image"),
+  });
+
   const handleDelete = (id: string, name: string) =>
     toast(`Supprimer "${name}" ?`, {
       action: { label: "Confirmer", onClick: () => deleteMut.mutate(id) },
@@ -597,9 +613,9 @@ export default function CategoriesPage() {
                 onAddChild={handleAddChild}
                 onToggleVisible={(id) => visibilityMut.mutate(id)}
                 onBannerChange={(id, file) => bannerMut.mutate({ id, file })}
-                saving={updateMut.isPending}
+                onBannerDelete={(id) => deleteBannerMut.mutate(id)}
+                bannerUploading={bannerMut.isPending || deleteBannerMut.isPending}
                 deleting={deleteMut.isPending}
-                bannerUploading={bannerMut.isPending}
               />
             ))
           }

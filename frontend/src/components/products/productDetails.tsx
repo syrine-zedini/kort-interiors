@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
-import { ProductWithVariants, ProductVariant } from "../../types/product";
+import { ProductWithVariants, ProductItem, ProductType, ProductVariant } from "../../types/product";
+import { SimilarProducts } from "./SimilarProducts";
 import { useAddToCart } from "@/hooks/useCart";
 import { getAllColors } from "@/services/color.service";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1372,6 +1373,13 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                     )}
                 </div>
             </div>
+
+            {/* Similar Products */}
+            <SimilarProducts 
+                categoryId={product.categoryId} 
+                currentProductId={product.id} 
+                categorySlug={categorySlug} 
+            />
 
             {/* Toast Notification */}
             {showToast && (

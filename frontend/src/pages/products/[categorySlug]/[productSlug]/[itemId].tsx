@@ -8,6 +8,7 @@ import { ProductWithVariants, ProductItem } from "@/types/product";
 import { useAddToCart } from "@/hooks/useCart";
 import { getAllColors } from "@/services/color.service";
 import AuthModal from "@/components/home/AuthModal";
+import { SimilarProducts } from "@/components/products/SimilarProducts";
 
 const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "";
 
@@ -465,6 +466,13 @@ export default function ItemDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Similar Products */}
+            <SimilarProducts 
+                categoryId={product.categoryId} 
+                currentProductId={product.id} 
+                categorySlug={Array.isArray(categorySlug) ? categorySlug[0] : categorySlug ?? ""} 
+            />
 
             {/* Toast Notification */}
             {showToast && (

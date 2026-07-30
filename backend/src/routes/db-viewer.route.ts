@@ -115,8 +115,8 @@ router.post('/local-products', adminAuth, async (req, res) => {
       categoryId: finalCategoryId,
       slug,
       productType: 1,
-      details: Array.isArray(details) ? details : undefined,
-      isDetailsEnabled: Boolean(isDetailsEnabled),
+      details: Array.isArray(details) ? details : [],
+      isDetailsEnabled: isDetailsEnabled === true || isDetailsEnabled === 'true',
       manualVariants: Boolean(manualVariants),
       sizeMaterialPricing: typeof sizeMaterialPricing === 'object' ? sizeMaterialPricing : undefined,
     } as any);
@@ -148,7 +148,7 @@ router.post('/local-products', adminAuth, async (req, res) => {
 router.put('/local-products/:id', adminAuth, async (req, res) => {
   const product = await Product.findByPk(String(req.params.id));
   if (!product) return res.status(404).json({ message: 'Produit introuvable' });
-  const { code, name, price, description, images, categoryId, discount, colors, sizes, styles, visible } = req.body;
+  const { code, name, price, description, images, categoryId, discount, colors, sizes, styles, visible, details, isDetailsEnabled } = req.body;
   if (name !== undefined) product.name = name;
   if (code !== undefined) product.code = code;
   if (price !== undefined) {
@@ -165,6 +165,8 @@ router.put('/local-products/:id', adminAuth, async (req, res) => {
   if (sizes !== undefined) (product as any).sizes = Array.isArray(sizes) ? sizes : [];
   if (styles !== undefined) (product as any).styles = Array.isArray(styles) ? styles : [];
   if (visible !== undefined) (product as any).visible = Boolean(visible);
+  if (details !== undefined) (product as any).details = Array.isArray(details) ? details : [];
+  if (isDetailsEnabled !== undefined) (product as any).isDetailsEnabled = Boolean(isDetailsEnabled);
   if (categoryId !== undefined) {
     if (categoryId && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(categoryId)) {
       let cat = await ProductCategory.findOne({ where: { slug: categoryId } });
