@@ -7,6 +7,7 @@ import BlogSection from "../components/home/BlogSection";
 import SocialSection from "../components/home/SocialSection";
 import NewsletterSection from "../components/home/NewsletterSection";
 import SiteFooter from "../components/home/SiteFooter";
+import PromoModal from "../components/home/PromoModal";
 
 export default function Home() {
   return (
@@ -20,6 +21,7 @@ export default function Home() {
       <SocialSection />
       <NewsletterSection />
       <SiteFooter />
+      <PromoModal />
     </div>
   );
 }

@@ -2,43 +2,21 @@ import { FadeUp, StaggerContainer, StaggerItem } from "../ui/Animate";
 
 const pillars = [
   {
-    icon: (
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#1a1a1a" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="20,2 38,12 38,28 20,38 2,28 2,12" />
-        <polygon points="20,11 29,16.5 29,23.5 20,29 11,23.5 11,16.5" />
-      </svg>
-    ),
+    image: "/editorial/pillar_matieres.jpg",
     num: "01",
     label: "Matières",
     title: "Matières d'exception",
     desc: "Coton pima, lin lavé, percale de coton égyptien — chaque fibre sélectionnée pour sa douceur, sa longévité et son élégance naturelle.",
   },
   {
-    icon: (
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#1a1a1a" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="20" cy="20" r="17" />
-        <circle cx="20" cy="20" r="10" />
-        <circle cx="20" cy="20" r="2" fill="#1a1a1a" />
-        <line x1="20" y1="3" x2="20" y2="9" />
-        <line x1="20" y1="31" x2="20" y2="37" />
-        <line x1="3" y1="20" x2="9" y2="20" />
-        <line x1="31" y1="20" x2="37" y2="20" />
-      </svg>
-    ),
+    image: "/editorial/pillar_qualite.jpg",
     num: "02",
     label: "Qualité",
     title: "Qualité certifiée",
     desc: "Nos textiles répondent aux normes OEKO-TEX® Standard 100. Aucune substance nocive — pour votre confort et celui de votre famille.",
   },
   {
-    icon: (
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#1a1a1a" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="16" width="32" height="20" rx="1" />
-        <path d="M12 16 L12 10 C12 6 28 6 28 10 L28 16" />
-        <line x1="4" y1="24" x2="36" y2="24" />
-        <line x1="20" y1="24" x2="20" y2="36" />
-      </svg>
-    ),
+    image: "/editorial/pillar_livraison.jpg",
     num: "03",
     label: "Livraison",
     title: "Livraison & Retours",
@@ -48,122 +26,425 @@ const pillars = [
 
 export default function EditorialSection() {
   return (
-    <section style={{ background: "#f5f0e8" }}>
-      <div style={{ maxWidth: "1440px", margin: "0 auto", padding: "96px 40px" }}>
+    <section className="editorial-section">
+      {/* Decorative background pattern */}
+      <div className="editorial-bg-pattern" />
 
-        {/* En-tête */}
-        <FadeUp style={{ marginBottom: "80px" }}>
-          <p style={{
-            fontSize: "9px", letterSpacing: "5px", textTransform: "uppercase",
-            color: "#999", margin: "0 0 14px",
-          }}>
-            Notre engagement
-          </p>
-          <h2 style={{
-            fontSize: "clamp(28px, 3.5vw, 44px)", fontWeight: 200,
-            color: "#0e0d0c", margin: 0, letterSpacing: "-0.5px",
-          }}>
-            L&apos;art de vivre Kort
+      <div className="editorial-inner">
+
+        {/* Header */}
+        <FadeUp className="editorial-header">
+          <div className="editorial-eyebrow-wrap">
+            <span className="editorial-line" />
+            <p className="editorial-eyebrow">Notre engagement</p>
+            <span className="editorial-line" />
+          </div>
+          <h2 className="editorial-title">
+            L&apos;art de vivre{" "}
+            <em className="editorial-title-italic">Kort</em>
           </h2>
+          <p className="editorial-subtitle">
+            Chaque détail conçu pour sublimer votre quotidien
+          </p>
         </FadeUp>
 
-        {/* Trois colonnes */}
-        <StaggerContainer style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: "0",
-        }}
-          className="pillar-grid"
-        >
+        {/* Gold accent divider */}
+        <div className="editorial-gold-divider" />
+
+        {/* Three pillars */}
+        <StaggerContainer className="pillar-grid">
           {pillars.map((p, i) => (
-            <StaggerItem
-              key={i}
-              className="pillar-col"
-              style={{
-                padding: "0 48px 0 0",
-                borderRight: "1px solid rgba(14,13,12,0.12)",
-                marginRight: "48px",
-              }}
+            <StaggerItem key={i}
+              className={`pillar-col pillar-col-${i}`}
             >
-              {/* Numéro + icône côte à côte */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", marginBottom: "36px" }}>
-                <span style={{
-                  fontSize: "11px", fontWeight: 300,
-                  letterSpacing: "2px", color: "#bbb",
-                  paddingTop: "3px", minWidth: "24px",
-                }}>
-                  {p.num}
-                </span>
-                {p.icon}
+              {/* Image */}
+              <div className="pillar-img-wrap">
+                <img src={p.image} alt={p.title} className="pillar-img" />
+                <div className="pillar-img-overlay" />
+                <span className="pillar-num-badge">{p.num}</span>
               </div>
 
-              {/* Label */}
-              <p style={{
-                fontSize: "8px", letterSpacing: "4px", textTransform: "uppercase",
-                color: "#999", margin: "0 0 14px",
-              }}>
-                {p.label}
-              </p>
+              {/* Content */}
+              <div className="pillar-content">
+                {/* Gold accent line */}
+                <div className="pillar-accent-line" />
 
-              <h3 style={{
-                fontSize: "20px", fontWeight: 400, color: "#0e0d0c",
-                margin: "0 0 18px", letterSpacing: "0.2px",
-              }}>
-                {p.title}
-              </h3>
+                {/* Label */}
+                <p className="pillar-label">{p.label}</p>
 
-              <p style={{
-                fontSize: "13px", lineHeight: 2.0, color: "#6b6b6b",
-              }}>
-                {p.desc}
-              </p>
+                {/* Title */}
+                <h3 className="pillar-title">{p.title}</h3>
+
+                {/* Desc */}
+                <p className="pillar-desc">{p.desc}</p>
+
+                {/* Hover reveal arrow */}
+                <div className="pillar-arrow">
+                  <svg width="20" height="8" viewBox="0 0 28 8" fill="none" stroke="currentColor" strokeWidth="1">
+                    <line x1="0" y1="4" x2="24" y2="4" />
+                    <polyline points="20,1 24,4 20,7" />
+                  </svg>
+                </div>
+              </div>
+
             </StaggerItem>
           ))}
         </StaggerContainer>
 
-        {/* Ligne de séparation + CTA */}
-        <div style={{
-          marginTop: "80px", paddingTop: "56px",
-          borderTop: "1px solid rgba(14,13,12,0.1)",
-          display: "flex", justifyContent: "center",
-        }}>
-          <a
-            href="/products"
-            className="pillar-cta"
-            style={{
-              display: "inline-flex", alignItems: "center", gap: "16px",
-              fontSize: "9px", letterSpacing: "4px", textTransform: "uppercase",
-              color: "#0e0d0c", textDecoration: "none",
-              paddingBottom: "3px", borderBottom: "1px solid #0e0d0c",
-              transition: "opacity 0.2s",
-            }}
-          >
-            Explorer tous nos produits
-            <svg width="28" height="8" viewBox="0 0 28 8" fill="none" stroke="currentColor" strokeWidth="1">
-              <line x1="0" y1="4" x2="24" y2="4" />
-              <polyline points="20,1 24,4 20,7" />
-            </svg>
+        {/* CTA */}
+        <FadeUp className="editorial-cta-wrap">
+          <a href="/products" className="editorial-cta">
+            <span>Explorer tous nos produits</span>
+            <span className="editorial-cta-icon">
+              <svg width="32" height="10" viewBox="0 0 32 10" fill="none" stroke="currentColor" strokeWidth="1">
+                <line x1="0" y1="5" x2="28" y2="5" />
+                <polyline points="24,1 28,5 24,9" />
+              </svg>
+            </span>
           </a>
-        </div>
+        </FadeUp>
       </div>
 
       <style jsx>{`
-        .pillar-cta:hover { opacity: 0.45; }
-        .pillar-col:last-child {
-          border-right: none !important;
-          margin-right: 0 !important;
-          padding-right: 0 !important;
+        .editorial-section {
+          position: relative;
+          background: linear-gradient(160deg, #f5efe5 0%, #ede4d6 50%, #f0e9dc 100%);
+          overflow: hidden;
         }
-        @media (max-width: 800px) {
-          .pillar-grid { gap: 48px !important; }
-          .pillar-col {
-            border-right: none !important;
-            border-bottom: 1px solid rgba(14,13,12,0.1) !important;
-            padding-right: 0 !important;
-            margin-right: 0 !important;
-            padding-bottom: 48px !important;
+
+        .editorial-bg-pattern {
+          position: absolute;
+          inset: 0;
+          background-image:
+            radial-gradient(circle at 15% 20%, rgba(201,169,110,0.08) 0%, transparent 50%),
+            radial-gradient(circle at 85% 80%, rgba(201,169,110,0.06) 0%, transparent 50%);
+          pointer-events: none;
+        }
+
+        .editorial-inner {
+          position: relative;
+          z-index: 1;
+          max-width: 1320px;
+          margin: 0 auto;
+          padding: 110px 48px 100px;
+        }
+
+        /* Header */
+        .editorial-header {
+          text-align: center;
+          margin-bottom: 56px;
+        }
+
+        .editorial-eyebrow-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          margin-bottom: 28px;
+        }
+
+        .editorial-line {
+          display: block;
+          width: 48px;
+          height: 1px;
+          background: linear-gradient(to right, transparent, #c9a96e, transparent);
+        }
+
+        .editorial-eyebrow {
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 5px;
+          text-transform: uppercase;
+          color: #c9a96e;
+          margin: 0;
+        }
+
+        .editorial-title {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: clamp(38px, 5vw, 64px);
+          font-weight: 300;
+          color: #0e0c0a;
+          margin: 0 0 18px;
+          letter-spacing: -0.5px;
+          line-height: 1.05;
+        }
+
+        .editorial-title-italic {
+          font-style: italic;
+          font-weight: 400;
+          color: #c9a96e;
+        }
+
+        .editorial-subtitle {
+          font-family: 'Outfit', sans-serif;
+          font-size: 14px;
+          font-weight: 300;
+          letter-spacing: 1.5px;
+          color: #8a7e72;
+          margin: 0;
+          text-transform: uppercase;
+        }
+
+        .editorial-gold-divider {
+          width: 80px;
+          height: 1px;
+          background: linear-gradient(to right, transparent, #c9a96e, transparent);
+          margin: 0 auto 72px;
+        }
+
+        /* Pillar Grid */
+        :global(.pillar-grid) {
+          display: grid !important;
+          grid-template-columns: repeat(3, 1fr) !important;
+          gap: 0 !important;
+        }
+
+        :global(.pillar-col) {
+          position: relative;
+          transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+        }
+
+        :global(.pillar-col-0) {
+          padding: 0 52px 0 0 !important;
+          border-right: 1px solid rgba(201,169,110,0.2) !important;
+        }
+
+        :global(.pillar-col-1) {
+          padding: 0 52px 0 52px !important;
+          border-right: 1px solid rgba(201,169,110,0.2) !important;
+        }
+
+        :global(.pillar-col-2) {
+          padding: 0 0 0 52px !important;
+        }
+
+        :global(.pillar-col:hover) {
+          transform: translateY(-4px);
+        }
+
+        /* Image */
+        .pillar-img-wrap {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4/3;
+          border-radius: 12px;
+          overflow: hidden;
+          margin-bottom: 28px;
+        }
+
+        .pillar-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.7s cubic-bezier(0.16,1,0.3,1);
+        }
+
+        :global(.pillar-col:hover) .pillar-img {
+          transform: scale(1.06);
+        }
+
+        .pillar-img-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to bottom, transparent 40%, rgba(14,12,10,0.35) 100%);
+          transition: opacity 0.4s ease;
+        }
+
+        :global(.pillar-col:hover) .pillar-img-overlay {
+          opacity: 0.7;
+        }
+
+        .pillar-num-badge {
+          position: absolute;
+          top: 14px;
+          left: 16px;
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: 42px;
+          font-weight: 300;
+          color: rgba(255,255,255,0.85);
+          line-height: 1;
+          letter-spacing: -1px;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Content block */
+        .pillar-content {
+          padding: 0;
+        }
+
+        .pillar-accent-line {
+          width: 32px;
+          height: 1px;
+          background: linear-gradient(to right, #c9a96e, transparent);
+          margin-bottom: 20px;
+          transition: width 0.4s ease;
+        }
+
+        :global(.pillar-col:hover) .pillar-accent-line {
+          width: 56px;
+        }
+
+        .pillar-label {
+          font-family: 'Outfit', sans-serif;
+          font-size: 9px;
+          font-weight: 500;
+          letter-spacing: 4px;
+          text-transform: uppercase;
+          color: #c9a96e;
+          margin: 0 0 12px;
+        }
+
+        .pillar-title {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: 24px;
+          font-weight: 400;
+          color: #0e0c0a;
+          margin: 0 0 16px;
+          letter-spacing: 0.2px;
+          line-height: 1.25;
+          transition: color 0.3s;
+        }
+
+        :global(.pillar-col:hover) .pillar-title {
+          color: #3a2d1f;
+        }
+
+        .pillar-desc {
+          font-family: 'Outfit', sans-serif;
+          font-size: 13px;
+          font-weight: 300;
+          line-height: 2;
+          color: #7a7065;
+          margin: 0 0 24px;
+        }
+
+        .pillar-arrow {
+          color: #c9a96e;
+          opacity: 0;
+          transform: translateX(-8px);
+          transition: opacity 0.3s, transform 0.3s;
+        }
+
+        :global(.pillar-col:hover) .pillar-arrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        /* CTA */
+        .editorial-cta-wrap {
+          margin-top: 72px;
+          padding-top: 56px;
+          border-top: 1px solid rgba(201,169,110,0.2);
+          display: flex;
+          justify-content: center;
+        }
+
+        .editorial-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 16px;
+          font-family: 'Outfit', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 5px;
+          text-transform: uppercase;
+          color: #0e0c0a;
+          text-decoration: none;
+          padding-bottom: 4px;
+          position: relative;
+          transition: color 0.3s;
+        }
+
+        .editorial-cta::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          height: 1px;
+          background: linear-gradient(to right, #c9a96e, #0e0c0a);
+          transform-origin: left;
+          transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+        }
+
+        .editorial-cta:hover { color: #c9a96e; }
+
+        .editorial-cta:hover::after {
+          background: linear-gradient(to right, #c9a96e, #c9a96e);
+        }
+
+        .editorial-cta-icon {
+          transition: transform 0.3s;
+        }
+        .editorial-cta:hover .editorial-cta-icon {
+          transform: translateX(6px);
+        }
+
+        /* Mobile */
+        @media (max-width: 900px) {
+          .editorial-inner { padding: 60px 16px 50px; }
+          :global(.pillar-grid) {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 12px !important;
           }
-          .pillar-col:last-child { border-bottom: none !important; padding-bottom: 0 !important; }
+          :global(.pillar-col-0), :global(.pillar-col-1), :global(.pillar-col-2) {
+            border-right: none !important;
+            padding: 0 !important;
+            margin-right: 0 !important;
+            margin-bottom: 0 !important;
+          }
+          :global(.pillar-col-0) {
+            border-right: 1px solid rgba(201,169,110,0.15) !important;
+            padding-right: 10px !important;
+          }
+          :global(.pillar-col-1) {
+            border-right: 1px solid rgba(201,169,110,0.15) !important;
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+          }
+          :global(.pillar-col-2) {
+            padding-left: 10px !important;
+          }
+          .pillar-title {
+            font-size: 16px;
+            word-wrap: break-word;
+          }
+          .pillar-desc {
+            font-size: 11px;
+            line-height: 1.6;
+          }
+          .pillar-num {
+            font-size: 32px;
+          }
+          .pillar-label {
+            font-size: 8px;
+            letter-spacing: 2px;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .editorial-title { font-size: 32px; }
+          .editorial-cta { font-size: 9px; letter-spacing: 2px; }
+          :global(.pillar-grid) {
+            gap: 8px !important;
+          }
+          :global(.pillar-col-0) {
+            padding-right: 8px !important;
+          }
+          :global(.pillar-col-1) {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+          :global(.pillar-col-2) {
+            padding-left: 8px !important;
+          }
+          .pillar-title {
+            font-size: 13px;
+          }
+          .pillar-desc {
+            font-size: 10px;
+          }
         }
       `}</style>
     </section>

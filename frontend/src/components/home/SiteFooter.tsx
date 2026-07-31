@@ -4,8 +4,8 @@ import { useCategories } from "@/hooks/useCategories";
 
 const footerLinks: Record<string, string[]> = {
   "Informations": ["À propos",  "Nos boutiques"],
-  //"Service client": ["Nous contacter"],
-  //"Légal": ["Mentions légales", "Confidentialité", "CGV", "Cookies"],
+  //\"Service client\": [\"Nous contacter\"],
+  //\"Légal\": [\"Mentions légales\", \"Confidentialité\", \"CGV\", \"Cookies\"],
 };
 
 function getFooterHref(label: string) {

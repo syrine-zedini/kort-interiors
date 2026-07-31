@@ -57,7 +57,7 @@ export default function BlogSection() {
               fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 200,
               letterSpacing: "-0.5px", color: "#0e0d0c", margin: 0, lineHeight: 1.1,
             }}>
-              Inspirations & Conseils
+              Inspirations &amp; Conseils
             </h2>
           </div>
           <Link href="/blog" style={{
