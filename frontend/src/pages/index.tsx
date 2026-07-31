@@ -3,6 +3,7 @@ import HeroSection from "../components/home/HeroSection";
 import CategoryTiles from "../components/home/CategoryTiles";
 import OffresSection from "../components/home/OffresSection";
 import EditorialSection from "../components/home/EditorialSection";
+import VideoSection from "../components/home/VideoSection";
 import BlogSection from "../components/home/BlogSection";
 import SocialSection from "../components/home/SocialSection";
 import NewsletterSection from "../components/home/NewsletterSection";
@@ -17,6 +18,7 @@ export default function Home() {
       <CategoryTiles />
       <OffresSection />
       <EditorialSection />
+      <VideoSection />
       <BlogSection />
       <SocialSection />
       <NewsletterSection />

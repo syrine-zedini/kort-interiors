@@ -45,3 +45,5 @@ admin/.env.local
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+frontend/public/videos/reel_3.mp4

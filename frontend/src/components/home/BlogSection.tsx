@@ -13,6 +13,42 @@ function estimateReadTime(content: string) {
   return `${minutes} min`;
 }
 
+const MOCK_BLOGS: Blog[] = [
+  {
+    id: "mock-1",
+    title: "L'Art du Lit en Lin Lavé : Le Chic Décontracté",
+    slug: "art-du-lit-lin-lave",
+    description: "Découvrez pourquoi le lin lavé est devenu l'indispensable des chambres contemporaines raffinées et comment l'adopter chez vous.",
+    content: "Le lin lavé est bien plus qu'une tendance...",
+    image: "/blog/blog_bedding.jpg",
+    author: "Linge de lit",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: "mock-2",
+    title: "L'art de Dresser une Table d'Exception",
+    slug: "art-dresser-table-exception",
+    description: "De la délicatesse de la porcelaine aux détails dorés des couverts, apprenez à composer une table poétique qui raconte une histoire.",
+    content: "Recevoir est un art...",
+    image: "/blog/blog_tableware.jpg",
+    author: "Art de la table",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: "mock-3",
+    title: "Créer un Refuge de Sérénité Chez Soi",
+    slug: "creer-refuge-serenite-chez-soi",
+    description: "Épuration des lignes, jeux de textures et teintes douces : nos conseils essentiels pour transformer votre intérieur en havre de paix.",
+    content: "Notre maison est notre sanctuaire...",
+    image: "/blog/blog_livingroom.jpg",
+    author: "Design d'intérieur",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
 export default function BlogSection() {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,9 +59,9 @@ export default function BlogSection() {
     const loadBlogs = async () => {
       try {
         const data = await fetchBlogs();
-        if (!cancelled) setBlogs(data);
+        if (!cancelled) setBlogs(data.length > 0 ? data : MOCK_BLOGS);
       } catch {
-        if (!cancelled) setBlogs([]);
+        if (!cancelled) setBlogs(MOCK_BLOGS);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -60,7 +96,7 @@ export default function BlogSection() {
               Inspirations &amp; Conseils
             </h2>
           </div>
-          <Link href="/blog" style={{
+          <Link href="/products" style={{
             fontSize: "9px", letterSpacing: "3px", textTransform: "uppercase",
             color: "#0e0d0c", textDecoration: "none", display: "flex",
             alignItems: "center", gap: "10px", paddingBottom: "4px",
@@ -83,7 +119,7 @@ export default function BlogSection() {
           <StaggerContainer className="blog-grid">
             {latestBlogs.map((a, i) => (
               <StaggerItem key={a.id}>
-                <Link href={`/blog/${a.slug}`} style={{ textDecoration: "none", display: "block" }} className="blog-card">
+                <div className="blog-card">
                   {/* Image placeholder */}
                   <div style={{
                     width: "100%", aspectRatio: "4/3",
@@ -94,7 +130,13 @@ export default function BlogSection() {
                   }}>
                     {a.image && (
                       <img
-                        src={typeof a.image === "string" && a.image.startsWith("http") ? a.image : `${IMAGE_BASE}${a.image}`}
+                        src={
+                          typeof a.image === "string" && a.image.startsWith("http")
+                            ? a.image
+                            : typeof a.image === "string" && a.image.startsWith("/")
+                            ? a.image
+                            : `${IMAGE_BASE}${a.image}`
+                        }
                         alt={a.title}
                         style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }}
                       />
@@ -123,35 +165,6 @@ export default function BlogSection() {
                     textAlign: "center"
                   }}>
 
-                    {/* Méta */}
-                    <div style={{
-                      display: "flex",
-                      gap: "16px",
-                      marginBottom: "14px",
-                      alignItems: "center",
-                      justifyContent: "center"
-                    }}>
-                      <span style={{ fontSize: "10px", color: "#999", letterSpacing: "0.5px" }}>
-                        {new Date(a.createdAt).toLocaleDateString("fr-FR", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </span>
-
-                      <span style={{
-                        width: "3px",
-                        height: "3px",
-                        borderRadius: "50%",
-                        background: "#ccc",
-                        display: "inline-block"
-                      }} />
-
-                      <span style={{ fontSize: "10px", color: "#999", letterSpacing: "0.5px" }}>
-                        {estimateReadTime(a.content)} de lecture
-                      </span>
-                    </div>
-
                     {/* Titre */}
                     <h3 style={{
                       fontSize: "18px",
@@ -174,27 +187,10 @@ export default function BlogSection() {
                       {a.description}
                     </p>
 
-                    {/* CTA */}
-                    <div style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      fontSize: "9px",
-                      letterSpacing: "3px",
-                      textTransform: "uppercase",
-                      color: "#0e0d0c",
-                      paddingBottom: "2px",
-                      borderBottom: "1px solid rgba(14,13,12,0.3)",
-                    }}>
-                      Lire l&apos;article
-                      <svg width="20" height="7" viewBox="0 0 20 7" fill="none" stroke="currentColor" strokeWidth="1">
-                        <line x1="0" y1="3.5" x2="17" y2="3.5" />
-                        <polyline points="13,1 17,3.5 13,6" />
-                      </svg>
-                    </div>
+                    {/* Removed CTA */}
 
                   </div>
-                </Link>
+                </div>
               </StaggerItem>
             ))}
           </StaggerContainer>
