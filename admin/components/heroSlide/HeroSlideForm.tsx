@@ -6,12 +6,34 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import ImageUploader from "@/components/ui/ImageUploader";
 import Button from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
 
 interface HeroSlideFormProps {
   initial?: HeroSlide;
   onSubmit: (data: CreateHeroSlidePayload) => Promise<void>;
   loading?: boolean;
 }
+
+const fontOptions = [
+  { value: "", label: "Police par défaut" },
+  { value: "var(--bd-ff-body)", label: "Sora" },
+  { value: "'Playfair Display', serif", label: "Playfair Display" },
+  { value: "'Montserrat', sans-serif", label: "Montserrat" },
+  { value: "'Inter', sans-serif", label: "Inter" },
+  { value: "'Georgia', serif", label: "Georgia" },
+  { value: "'Courier New', monospace", label: "Courier New" }
+];
+
+const weightOptions = [
+  { value: "", label: "Graisse par défaut" },
+  { value: "100", label: "Ultra Light (100)" },
+  { value: "200", label: "Extra Light (200)" },
+  { value: "300", label: "Light (300)" },
+  { value: "400", label: "Regular (400)" },
+  { value: "500", label: "Medium (500)" },
+  { value: "600", label: "Semi Bold (600)" },
+  { value: "700", label: "Bold (700)" },
+];
 
 export default function HeroSlideForm({ initial, onSubmit, loading }: HeroSlideFormProps) {
   const [eyebrow, setEyebrow] = useState(initial?.eyebrow ?? "");
@@ -22,6 +44,15 @@ export default function HeroSlideForm({ initial, onSubmit, loading }: HeroSlideF
   const [ctaLink, setCtaLink] = useState(initial?.ctaLink ?? "");
   const [image, setImage] = useState(initial?.image ?? "");
   const [sortOrder, setSortOrder] = useState(initial?.sortOrder ?? 0);
+  const [eyebrowColor, setEyebrowColor] = useState(initial?.eyebrowColor ?? "");
+  const [eyebrowFont, setEyebrowFont] = useState(initial?.eyebrowFont ?? "");
+  const [eyebrowWeight, setEyebrowWeight] = useState(initial?.eyebrowWeight ?? "");
+  const [titleColor, setTitleColor] = useState(initial?.titleColor ?? "");
+  const [titleFont, setTitleFont] = useState(initial?.titleFont ?? "");
+  const [titleWeight, setTitleWeight] = useState(initial?.titleWeight ?? "");
+  const [subtitleColor, setSubtitleColor] = useState(initial?.subtitleColor ?? "");
+  const [subtitleFont, setSubtitleFont] = useState(initial?.subtitleFont ?? "");
+  const [subtitleWeight, setSubtitleWeight] = useState(initial?.subtitleWeight ?? "");
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,6 +74,15 @@ export default function HeroSlideForm({ initial, onSubmit, loading }: HeroSlideF
         ctaLink: ctaLink || undefined,
         image: typeof image === "string" ? image : "",
         sortOrder: sortOrder || undefined,
+        eyebrowColor: eyebrowColor || "",
+        eyebrowFont: eyebrowFont || "",
+        eyebrowWeight: eyebrowWeight || "",
+        titleColor: titleColor || "",
+        titleFont: titleFont || "",
+        titleWeight: titleWeight || "",
+        subtitleColor: subtitleColor || "",
+        subtitleFont: subtitleFont || "",
+        subtitleWeight: subtitleWeight || "",
       });
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue");
@@ -58,39 +98,144 @@ export default function HeroSlideForm({ initial, onSubmit, loading }: HeroSlideF
       )}
 
       {/* Eyebrow */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Surtitre <span className="text-gray-500 text-xs">(optionnel)</span>
-        </label>
-        <Input
-          value={eyebrow}
-          onChange={(e) => setEyebrow(e.target.value)}
-          placeholder="e.g., Nouvelle Collection"
-        />
+      <div className="space-y-3 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Surtitre <span className="text-gray-500 text-xs">(optionnel)</span>
+          </label>
+          <Input
+            value={eyebrow}
+            onChange={(e) => setEyebrow(e.target.value)}
+            placeholder="e.g., Nouvelle Collection"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
+            <div className="flex gap-1">
+              <Input
+                type="color"
+                value={eyebrowColor || "#ffffff"}
+                onChange={(e) => setEyebrowColor(e.target.value)}
+                className="w-10 h-9 p-1"
+              />
+              <Input
+                value={eyebrowColor}
+                onChange={(e) => setEyebrowColor(e.target.value)}
+                placeholder="#ffffff"
+                className="flex-1 text-xs"
+              />
+            </div>
+          </div>
+          <Select
+            options={fontOptions}
+            value={eyebrowFont}
+            onChange={(e) => setEyebrowFont(e.target.value)}
+            label="Police"
+            className="text-xs"
+          />
+          <Select
+            options={weightOptions}
+            value={eyebrowWeight}
+            onChange={(e) => setEyebrowWeight(e.target.value)}
+            label="Graisse"
+            className="text-xs"
+          />
+        </div>
       </div>
 
       {/* Title */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Titre *</label>
-        <Input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Titre principal du slide"
-          required
-        />
+      <div className="space-y-3 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Titre *</label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Titre principal du slide"
+            required
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
+            <div className="flex gap-1">
+              <Input
+                type="color"
+                value={titleColor || "#ffffff"}
+                onChange={(e) => setTitleColor(e.target.value)}
+                className="w-10 h-9 p-1"
+              />
+              <Input
+                value={titleColor}
+                onChange={(e) => setTitleColor(e.target.value)}
+                placeholder="#ffffff"
+                className="flex-1 text-xs"
+              />
+            </div>
+          </div>
+          <Select
+            options={fontOptions}
+            value={titleFont}
+            onChange={(e) => setTitleFont(e.target.value)}
+            label="Police"
+            className="text-xs"
+          />
+          <Select
+            options={weightOptions}
+            value={titleWeight}
+            onChange={(e) => setTitleWeight(e.target.value)}
+            label="Graisse"
+            className="text-xs"
+          />
+        </div>
       </div>
 
       {/* Subtitle */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Sous-titre <span className="text-gray-500 text-xs">(optionnel)</span>
-        </label>
-        <Textarea
-          value={subtitle}
-          onChange={(e) => setSubtitle(e.target.value)}
-          placeholder="Description du slide"
-          rows={2}
-        />
+      <div className="space-y-3 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Sous-titre <span className="text-gray-500 text-xs">(optionnel)</span>
+          </label>
+          <Textarea
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="Description du slide"
+            rows={2}
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Couleur</label>
+            <div className="flex gap-1">
+              <Input
+                type="color"
+                value={subtitleColor || "#ffffff"}
+                onChange={(e) => setSubtitleColor(e.target.value)}
+                className="w-10 h-9 p-1"
+              />
+              <Input
+                value={subtitleColor}
+                onChange={(e) => setSubtitleColor(e.target.value)}
+                placeholder="#ffffff"
+                className="flex-1 text-xs"
+              />
+            </div>
+          </div>
+          <Select
+            options={fontOptions}
+            value={subtitleFont}
+            onChange={(e) => setSubtitleFont(e.target.value)}
+            label="Police"
+            className="text-xs"
+          />
+          <Select
+            options={weightOptions}
+            value={subtitleWeight}
+            onChange={(e) => setSubtitleWeight(e.target.value)}
+            label="Graisse"
+            className="text-xs"
+          />
+        </div>
       </div>
 
       {/* Background Color */}
@@ -129,30 +274,7 @@ export default function HeroSlideForm({ initial, onSubmit, loading }: HeroSlideF
         </div>
       </div>
 
-      {/* CTA Button Text */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Texte du bouton CTA <span className="text-gray-500 text-xs">(optionnel)</span>
-        </label>
-        <Input
-          value={cta}
-          onChange={(e) => setCta(e.target.value)}
-          placeholder="e.g., Découvrir la collection"
-        />
-      </div>
 
-      {/* CTA Button Link */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          URL du bouton CTA <span className="text-gray-500 text-xs">(optionnel)</span>
-        </label>
-        <Input
-          value={ctaLink}
-          onChange={(e) => setCtaLink(e.target.value)}
-          placeholder="e.g., /products, /blog, https://example.com"
-        />
-        <p className="text-xs text-gray-500 mt-1">Relatif (/products) ou absolu (https://example.com)</p>
-      </div>
 
       {/* Image */}
       <div>

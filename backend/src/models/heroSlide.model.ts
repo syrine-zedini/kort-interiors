@@ -11,6 +11,15 @@ interface HeroSlideAttributes {
     ctaLink?: string;
     image?: string;
     sortOrder: number;
+    eyebrowColor?: string;
+    eyebrowFont?: string;
+    eyebrowWeight?: string;
+    titleColor?: string;
+    titleFont?: string;
+    titleWeight?: string;
+    subtitleColor?: string;
+    subtitleFont?: string;
+    subtitleWeight?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -27,6 +36,15 @@ export class HeroSlide extends Model<HeroSlideAttributes, HeroSlideCreationAttri
     declare ctaLink?: string;
     declare image?: string;
     declare sortOrder: number;
+    declare eyebrowColor?: string;
+    declare eyebrowFont?: string;
+    declare eyebrowWeight?: string;
+    declare titleColor?: string;
+    declare titleFont?: string;
+    declare titleWeight?: string;
+    declare subtitleColor?: string;
+    declare subtitleFont?: string;
+    declare subtitleWeight?: string;
     declare readonly createdAt: Date;
     declare readonly updatedAt: Date;
 }
@@ -70,6 +88,42 @@ HeroSlide.init(
             type: DataTypes.INTEGER,
             allowNull: false,
             defaultValue: 0,
+        },
+        eyebrowColor: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+        },
+        eyebrowFont: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        eyebrowWeight: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+        },
+        titleColor: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+        },
+        titleFont: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        titleWeight: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+        },
+        subtitleColor: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
+        },
+        subtitleFont: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+        },
+        subtitleWeight: {
+            type: DataTypes.STRING(50),
+            allowNull: true,
         },
         createdAt: {
             type: DataTypes.DATE,

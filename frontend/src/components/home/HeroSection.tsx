@@ -210,13 +210,16 @@ export default function HeroSection() {
                 variants={heroLine}
                 style={{
                   display: "block", width: "40px", height: "1px",
-                  background: "rgba(255,255,255,0.45)",
+                  background: slides[activeIndex]?.eyebrowColor || "rgba(255,255,255,0.45)",
                   transformOrigin: "left",
                 }}
               />
               <p style={{
                 fontSize: "9px", letterSpacing: "5px",
-                textTransform: "uppercase", color: "rgba(255,255,255,0.6)",
+                textTransform: "uppercase", 
+                color: slides[activeIndex]?.eyebrowColor || "rgba(255,255,255,0.6)",
+                fontFamily: slides[activeIndex]?.eyebrowFont || "inherit",
+                fontWeight: slides[activeIndex]?.eyebrowWeight ? Number(slides[activeIndex].eyebrowWeight) : "inherit",
                 margin: 0,
               }}>
                 {slides[activeIndex]?.eyebrow}
@@ -228,12 +231,13 @@ export default function HeroSection() {
               variants={heroItem}
               style={{
                 fontSize: "clamp(36px, 5vw, 68px)",
-                fontWeight: 200,
+                fontWeight: slides[activeIndex]?.titleWeight ? Number(slides[activeIndex].titleWeight) : 200,
+                fontFamily: slides[activeIndex]?.titleFont || "inherit",
                 letterSpacing: "-1px",
                 lineHeight: 1.08,
                 margin: "0 0 22px",
                 whiteSpace: "pre-line",
-                color: "#ffffff",
+                color: slides[activeIndex]?.titleColor || "#ffffff",
                 textShadow: "0 1px 8px rgba(0,0,0,0.3)",
               }}
             >
@@ -244,10 +248,12 @@ export default function HeroSection() {
             <motion.p
               variants={heroItem}
               style={{
-                fontSize: "11px", fontWeight: 300,
+                fontSize: "11px", 
+                fontWeight: slides[activeIndex]?.subtitleWeight ? Number(slides[activeIndex].subtitleWeight) : 300,
+                fontFamily: slides[activeIndex]?.subtitleFont || "inherit",
                 letterSpacing: "2.5px",
                 margin: "0 0 40px",
-                color: "rgba(255,255,255,0.5)",
+                color: slides[activeIndex]?.subtitleColor || "rgba(255,255,255,0.5)",
                 textTransform: "uppercase",
               }}
             >

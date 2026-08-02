@@ -236,6 +236,78 @@ const REQUIRED_COLUMNS: ColumnSpec[] = [
       allowNull: false,
     },
   },
+  {
+    table: "hero_slides",
+    column: "eyebrowColor",
+    definition: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "eyebrowFont",
+    definition: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "eyebrowWeight",
+    definition: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "titleColor",
+    definition: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "titleFont",
+    definition: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "titleWeight",
+    definition: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "subtitleColor",
+    definition: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "subtitleFont",
+    definition: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+  },
+  {
+    table: "hero_slides",
+    column: "subtitleWeight",
+    definition: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+  },
 ];
 
 const ensureColumn = async (qi: QueryInterface, spec: ColumnSpec) => {
