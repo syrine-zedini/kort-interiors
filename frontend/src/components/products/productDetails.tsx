@@ -780,13 +780,13 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                                     </div>
                                     {savingsAmount > 0 && (
                                         <p style={{ fontSize: 12, color: "#c0392b", margin: "6px 0 0" }}>
-                                            Économisez {savingsAmount.toFixed(2)}DT
+                                        Économisez {(savingsAmount * quantity).toFixed(2)}DT
                                         </p>
                                     )}
                                 </div>
                             )}
                             <span style={{ fontSize: 28, fontWeight: 400, color: (displayDiscount > 0 || product.promotion) ? "#c0392b" : "#1a1a1a" }}>
-                                {finalPrice.toFixed(2)}DT
+                                {(finalPrice * quantity).toFixed(2)}DT
                             </span>
                         </div>
                     ) : (
