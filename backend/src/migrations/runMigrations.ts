@@ -40,6 +40,22 @@ const REQUIRED_COLUMNS: ColumnSpec[] = [
   },
   {
     table: "products",
+    column: "sizes",
+    definition: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      allowNull: true,
+    },
+  },
+  {
+    table: "products",
+    column: "colors",
+    definition: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      allowNull: true,
+    },
+  },
+  {
+    table: "products",
     column: "code",
     definition: {
       type: DataTypes.STRING(100),
