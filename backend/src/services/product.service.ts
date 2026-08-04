@@ -761,6 +761,8 @@ export const updateProduct = async (id: string, data: any) => {
     const product = await Product.findByPk(id);
     if (!product) throw new Error('Produit introuvable');
 
+    console.log(`[updateProduct] id=${id} sizePricing_received=${JSON.stringify(data.sizePricing)} sizeMaterialPricing_received=${JSON.stringify(data.sizeMaterialPricing)}`);
+
     if (data.name !== undefined) {
         product.name = data.name;
         const baseSlug = generateSlug(data.name || data.code || product.code);
@@ -789,6 +791,8 @@ export const updateProduct = async (id: string, data: any) => {
     if (data.productType !== undefined) product.productType = data.productType;
 
     await product.save();
+    console.log(`[updateProduct] after save: sizePricing=${JSON.stringify(product.sizePricing)}`);
+
 
     // Sync variants if provided
     if (data.variants !== undefined) {
