@@ -357,6 +357,19 @@ const ensureColumn = async (qi: QueryInterface, spec: ColumnSpec) => {
 
 export const runMigrations = async (sequelize: Sequelize) => {
   const qi = sequelize.getQueryInterface();
+
+  // Force raw PostgreSQL column checks to ensure they are created with exact casing
+  try {
+    await sequelize.query('ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "sizePricing" JSONB');
+    await sequelize.query('ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "sizeMaterialPricing" JSONB');
+    await sequelize.query('ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "sizes" VARCHAR(255)[]');
+    await sequelize.query('ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "colors" VARCHAR(255)[]');
+    await sequelize.query('ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "applicableSizes" VARCHAR(255)[]');
+    console.log('✅ Forced raw column additions on products and promotions tables');
+  } catch (err: any) {
+    console.error('❌ Raw column additions failed:', err.message);
+  }
+
   for (const spec of REQUIRED_COLUMNS) {
     await ensureColumn(qi, spec);
   }
