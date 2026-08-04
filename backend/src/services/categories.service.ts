@@ -307,11 +307,49 @@ export async function getAllCategoriesWithChildren() {
         // Only root local categories that are explicitly visible AND not already in OOPOS
         const localRoots = localCats.filter(c =>
             !((c as any).parents?.length) &&
-            (c as any).visible === true &&
+            (c as any).visible !== false &&
             !ooposNames.has(c.name.trim().toUpperCase())
         );
 
         const localNodes = localRoots.map(c => makeLocalNode(c, new Set<string>())).filter(Boolean);
+
+        // ─── Also merge local child categories into matching OOPOS parents ───
+        // (e.g. "UNIVERS MASCULIN" is a local child of "LINGE DE LIT" which is OOPOS)
+        const findNodeByName = (nodes: any[], name: string): any => {
+            const n = name.trim().toUpperCase();
+            for (const node of nodes) {
+                if (node.name.trim().toUpperCase() === n) return node;
+                if (node.children?.length) {
+                    const found = findNodeByName(node.children, name);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const localChildren = localCats.filter(c =>
+            (c as any).visible !== false &&
+            !ooposNames.has(c.name.trim().toUpperCase()) &&
+            ((c as any).parents?.length ?? 0) > 0
+        );
+
+        for (const localCat of localChildren) {
+            const parents: any[] = (localCat as any).parents ?? [];
+            for (const parentRef of parents) {
+                const fullParent = localCats.find(c => String(c.id) === String(parentRef.id));
+                if (!fullParent) continue;
+                const ooposParent = findNodeByName(rootNodes, fullParent.name);
+                if (ooposParent) {
+                    const alreadyIn = ooposParent.children.some(
+                        (ch: any) => ch.name.trim().toUpperCase() === localCat.name.trim().toUpperCase()
+                    );
+                    if (!alreadyIn) {
+                        const localNode = makeLocalNode(localCat, new Set<string>());
+                        if (localNode) ooposParent.children.push(localNode);
+                    }
+                }
+            }
+        }
 
         // Merge: OOPOS + local-only visible, sorted alphabetically
         const allNodes = [...rootNodes, ...localNodes];
