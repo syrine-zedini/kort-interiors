@@ -161,7 +161,7 @@ export default function LuxuryNavbar({ transparent = true }: LuxuryNavbarProps) 
               }}
             >
               <div className="logo-img-nav" style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", flexShrink: 0 }}>
-                <Image
+                <img
                   src="/assets/logo.jpg" alt="Kort Interiors"
                   width={36} height={36}
                   style={{ objectFit: "cover", width: "100%", height: "100%" }}
