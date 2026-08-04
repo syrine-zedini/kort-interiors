@@ -118,6 +118,7 @@ router.post('/local-products', adminAuth, async (req, res) => {
       details: Array.isArray(details) ? details : [],
       isDetailsEnabled: isDetailsEnabled === true || isDetailsEnabled === 'true',
       manualVariants: Boolean(manualVariants),
+      sizePricing: typeof sizePricing === 'object' ? sizePricing : undefined,
       sizeMaterialPricing: typeof sizeMaterialPricing === 'object' ? sizeMaterialPricing : undefined,
     } as any);
 
@@ -148,7 +149,7 @@ router.post('/local-products', adminAuth, async (req, res) => {
 router.put('/local-products/:id', adminAuth, async (req, res) => {
   const product = await Product.findByPk(String(req.params.id));
   if (!product) return res.status(404).json({ message: 'Produit introuvable' });
-  const { code, name, price, description, images, categoryId, discount, colors, sizes, styles, visible, details, isDetailsEnabled } = req.body;
+  const { code, name, price, description, images, categoryId, discount, colors, sizes, styles, visible, details, isDetailsEnabled, sizePricing, sizeMaterialPricing, manualVariants, variants, items } = req.body;
   if (name !== undefined) product.name = name;
   if (code !== undefined) product.code = code;
   if (price !== undefined) {
@@ -167,6 +168,9 @@ router.put('/local-products/:id', adminAuth, async (req, res) => {
   if (visible !== undefined) (product as any).visible = Boolean(visible);
   if (details !== undefined) (product as any).details = Array.isArray(details) ? details : [];
   if (isDetailsEnabled !== undefined) (product as any).isDetailsEnabled = Boolean(isDetailsEnabled);
+  if (sizePricing !== undefined) (product as any).sizePricing = typeof sizePricing === 'object' ? sizePricing : null;
+  if (sizeMaterialPricing !== undefined) (product as any).sizeMaterialPricing = typeof sizeMaterialPricing === 'object' ? sizeMaterialPricing : null;
+  if (manualVariants !== undefined) (product as any).manualVariants = Boolean(manualVariants);
   if (categoryId !== undefined) {
     if (categoryId && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(categoryId)) {
       let cat = await ProductCategory.findOne({ where: { slug: categoryId } });
@@ -179,6 +183,23 @@ router.put('/local-products/:id', adminAuth, async (req, res) => {
     }
   }
   await product.save();
+
+  // Sync variants if provided
+  if (variants !== undefined) {
+    await ProductVariant.destroy({ where: { productId: product.id } });
+    if (Array.isArray(variants) && variants.length > 0) {
+      await ProductVariant.bulkCreate(variants.map(v => ({ ...v, id: undefined, productId: product.id })));
+    }
+  }
+
+  // Sync items if provided
+  if (items !== undefined) {
+    await ProductItem.destroy({ where: { productId: product.id } });
+    if (Array.isArray(items) && items.length > 0) {
+      await ProductItem.bulkCreate(items.map(i => ({ ...i, id: undefined, productId: product.id })));
+    }
+  }
+
   res.json(product);
 });
 

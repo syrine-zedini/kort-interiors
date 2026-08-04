@@ -7,7 +7,7 @@ import { ProductCard } from "./card";
 interface SimilarProductsProps {
     categoryId?: string;
     currentProductId: string;
-    categorySlug: string;
+    categorySlug?: string;
 }
 
 export const SimilarProducts: React.FC<SimilarProductsProps> = ({ categoryId, currentProductId, categorySlug }) => {

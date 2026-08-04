@@ -14,12 +14,14 @@ interface PromotionAttributes {
   productId?: string | null;
   categoryId?: string | null;
   subCategoryId?: string | null;
+  /** Restrict promotion to specific sizes only. Null/empty = all sizes. */
+  applicableSizes?: string[] | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 interface PromotionCreationAttributes
-  extends Optional<PromotionAttributes, "id" | "isActive" | "productId" | "categoryId" | "subCategoryId" | "createdAt" | "updatedAt"> {}
+  extends Optional<PromotionAttributes, "id" | "isActive" | "productId" | "categoryId" | "subCategoryId" | "applicableSizes" | "createdAt" | "updatedAt"> {}
 
 export class Promotion
   extends Model<PromotionAttributes, PromotionCreationAttributes>
@@ -34,6 +36,7 @@ export class Promotion
   declare productId?: string | null;
   declare categoryId?: string | null;
   declare subCategoryId?: string | null;
+  declare applicableSizes?: string[] | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -85,6 +88,11 @@ Promotion.init(
     subCategoryId: {
       type: DataTypes.UUID,
       allowNull: true,
+    },
+    applicableSizes: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      allowNull: true,
+      defaultValue: null,
     },
     createdAt: {
       type: DataTypes.DATE,

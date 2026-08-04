@@ -75,26 +75,32 @@ export default function OffresSection() {
 
     promotions.forEach((p) => {
       const start = new Date(p.startDate);
-      const end = new Date(p.endDate);
+      // Treat endDate as end-of-day to include the full last day
+      const endRaw = new Date(p.endDate);
+      const end = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate(), 23, 59, 59, 999);
       if (!p.isActive || now < start || now > end) return;
 
       const derivedCategory = p.product?.categoryId ? categoryMap[p.product.categoryId] : undefined;
       const category = p.subCategory ?? p.category ?? derivedCategory;
-      if (!category) return;
 
-      const id = category.id;
-      const current = map.get(id);
+      // If no category found, fall back to the product itself as the card key
+      const cardId = category?.id ?? (p.product?.id ? `product-${p.product.id}` : null);
+      const cardName = category?.name ?? p.product?.name ?? p.name;
+      if (!cardId) return;
+
+      const current = map.get(cardId);
       const discount = Number(p.discountValue || 0);
-      const image = p.product?.images?.[0]
-        ? (typeof p.product.images[0] === "string" && p.product.images[0].startsWith("http")
-            ? p.product.images[0]
-            : `${IMAGE_BASE}${p.product.images[0]}`)
+      const imageRaw = p.product?.images?.[0];
+      const image = imageRaw
+        ? (typeof imageRaw === "string" && imageRaw.startsWith("http")
+            ? imageRaw
+            : `${IMAGE_BASE}${imageRaw}`)
         : undefined;
 
       if (!current) {
-        map.set(id, {
-          id,
-          name: category.name,
+        map.set(cardId, {
+          id: cardId,
+          name: cardName,
           image,
           promotionsCount: 1,
           maxDiscount: p.discountType === "percentage" ? discount : 0,
@@ -204,7 +210,7 @@ export default function OffresSection() {
                             fontSize: "8px", letterSpacing: "3px", textTransform: "uppercase",
                             color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.5)",
                           }}>
-                            Catégorie en promotion
+                            {o.id.startsWith("product-") ? "Produit en promotion" : "Catégorie en promotion"}
                           </span>
                         </div>
 

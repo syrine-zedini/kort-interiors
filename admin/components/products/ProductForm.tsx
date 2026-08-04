@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCategories } from "@/lib/api";
+import { fetchCategories, fetchColors } from "@/lib/api";
 import api from "@/lib/axios";
 import { CreateProductPayload, Product, VariantDraft } from "@/types/product";
 import Input from "@/components/ui/Input";
@@ -27,6 +27,7 @@ interface ProductFormProps {
 
 export default function ProductForm({ initial, onSubmit, loading }: ProductFormProps) {
   const { data: categoryGroups = [] } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
+  const { data: allColorsList = [] } = useQuery({ queryKey: ["colors"], queryFn: fetchColors });
   const { data: localCategoriesRaw = [] } = useQuery<{ id: string; name: string; slug?: string }[]>({
     queryKey: ["local-categories-for-form"],
     queryFn: async () => {
@@ -40,12 +41,16 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
   const [code, setCode] = useState(initial?.code ?? "");
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
   const initialPricingMode: PricingMode = (() => {
+    // Check sizePricing first — explicit "size" mode signal that must win
+    if (initial?.sizePricing && Object.keys(initial.sizePricing).length > 0) return "size";
+    // Then check sizeMaterialPricing for material/size_material modes
     if (initial?.sizeMaterialPricing && Object.keys(initial.sizeMaterialPricing).length > 0) {
       return Object.keys(initial.sizeMaterialPricing).includes(MATERIAL_ONLY_SIZE_KEY)
         ? "material"
         : "size_material";
     }
-    if ((initial?.variants?.length ?? 0) > 0 || (initial?.sizes?.length ?? 0) > 0) return "size";
+    // Fallback: if there are sizes (but no sizePricing yet), still treat as "size"
+    if ((initial?.sizes?.length ?? 0) > 0) return "size";
     return "direct";
   })();
   const [pricingMode, setPricingMode] = useState<PricingMode>(initialPricingMode);
@@ -77,8 +82,13 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
     initialSizeCandidates
       .filter((size) => size !== MATERIAL_ONLY_SIZE_KEY)
       .forEach((size) => {
-        const fromVariant = variantBySize.get(size);
-        next[size] = fromVariant != null ? String(fromVariant) : "";
+        const fromSizePricing = initial?.sizePricing?.[size]?.price;
+        if (fromSizePricing != null) {
+          next[size] = String(fromSizePricing);
+        } else {
+          const fromVariant = variantBySize.get(size);
+          next[size] = fromVariant != null ? String(fromVariant) : "";
+        }
       });
     return next;
   });
@@ -235,9 +245,30 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
     e.preventDefault();
 
     const cleanedSizes = sizes.map((s) => s.trim()).filter(Boolean);
-    const backendSizeMaterialPricing = normalizeSizeMaterialPricing(sizeMaterialPricing);
+    
+    // Filter pricing maps to only include colors that are currently selected in the form
+    const filteredMaterialPricing: Record<string, string> = {};
+    Object.entries(materialPricing).forEach(([colorId, val]) => {
+      if (colors.includes(colorId)) {
+        filteredMaterialPricing[colorId] = val;
+      }
+    });
+
+    const filteredSizeMaterialPricing: Record<string, Record<string, string>> = {};
+    Object.entries(sizeMaterialPricing).forEach(([size, colorPrices]) => {
+      if (cleanedSizes.includes(size)) {
+        filteredSizeMaterialPricing[size] = {};
+        Object.entries(colorPrices).forEach(([colorId, val]) => {
+          if (colors.includes(colorId)) {
+            filteredSizeMaterialPricing[size][colorId] = val;
+          }
+        });
+      }
+    });
+
+    const backendSizeMaterialPricing = normalizeSizeMaterialPricing(filteredSizeMaterialPricing);
     const backendMaterialPricing = normalizeSizeMaterialPricing({
-      [MATERIAL_ONLY_SIZE_KEY]: materialPricing,
+      [MATERIAL_ONLY_SIZE_KEY]: filteredMaterialPricing,
     });
     const backendSizePricing = Object.fromEntries(
       cleanedSizes
@@ -336,7 +367,10 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
               : !manualVariants && pricingMode === "size_material"
                 ? (cleanedSizes.length > 0 ? cleanedSizes : undefined)
                 : undefined,
-      colors: !manualVariants && colors.length > 0 ? colors : undefined,
+      // In size-only mode, explicitly clear colors so the frontend doesn't show a color picker
+      colors: !manualVariants && pricingMode === "size"
+        ? []
+        : (!manualVariants && colors.length > 0 ? colors : undefined),
       styles: styles.length > 0 ? styles : undefined,
       isDetailsEnabled,
       details: details.filter(d => d.key.trim() && d.value.trim()),
@@ -347,13 +381,15 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
       sizePricing:
         !manualVariants && pricingMode === "size" && Object.keys(backendSizePricing).length > 0
           ? backendSizePricing
-          : undefined,
+          // Explicitly null to clear in DB when not in size mode
+          : (!manualVariants && pricingMode !== "size" ? null : undefined),
       sizeMaterialPricing:
         !manualVariants && pricingMode === "material"
           ? backendMaterialPricing
           : !manualVariants && pricingMode === "size_material"
             ? backendSizeMaterialPricing
-            : undefined,
+            // Explicitly null to clear in DB when not in material/size_material mode
+            : (!manualVariants ? null : undefined),
       images,
       items: cleanedItems.length > 0 ? cleanedItems : undefined,
     });
@@ -481,8 +517,8 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
           options={[
             { value: "direct", label: "Prix simple" },
             { value: "size", label: "Prix par taille" },
-            { value: "material", label: "Prix par matériau" },
-            { value: "size_material", label: "Prix par taille + matériau" },
+            { value: "material", label: "Prix par couleur" },
+            { value: "size_material", label: "Prix par taille + couleur" },
           ]}
         />
 
@@ -550,138 +586,87 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
 
         {pricingMode === "material" && (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-700">Prix par matériau</p>
-            <Input
-              label=""
-              placeholder="Ajouter un matériau (Entrée)"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  const input = (e.target as HTMLInputElement).value.trim();
-                  if (!input) return;
-                  setMaterialPricing((prev) => ({ ...prev, [input]: prev[input] ?? "" }));
-                  (e.target as HTMLInputElement).value = "";
-                }
-              }}
-            />
-            {Object.keys(materialPricing).length > 0 && (
-              <div className="space-y-2 border-t border-gray-100 pt-3">
-                {Object.entries(materialPricing).map(([material, price]) => (
-                  <div key={material} className="grid grid-cols-[150px_1fr_50px] gap-2 items-center">
-                    <span className="text-sm font-medium text-gray-700">{material}</span>
-                    <Input
-                      label=""
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={price}
-                      onChange={(e) =>
-                        setMaterialPricing((prev) => ({
-                          ...prev,
-                          [material]: e.target.value,
-                        }))
-                      }
-                      placeholder="Prix (DT)"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMaterialPricing((prev) => {
-                          const next = { ...prev };
-                          delete next[material];
-                          return next;
-                        })
-                      }
-                      className="text-red-500 hover:text-red-700 text-sm font-bold"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
+            <p className="text-sm font-medium text-gray-700">Prix par couleur</p>
+            {colors.length === 0 && (
+              <p className="text-xs text-gray-400 italic">Aucune couleur sélectionnée. Ajoutez des couleurs ci-dessous.</p>
             )}
-          </div>
-        )}
-
-        <ColorMultiSelect
-          label="Couleurs (appuyer Entrée pour valider)"
-          value={colors}
-          onChange={setColors}
-        />
-      </section>
-
-      {/* ── Size Material Pricing ── */}
-      {pricingMode === "size_material" && sizes.length > 0 && (
-        <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-          <h2 className="font-semibold text-gray-800">Prix par Taille & Matériau</h2>
-          {sizes.map((size) => (
-            <div key={size} className="border border-gray-100 rounded-lg p-4 space-y-3">
-              <h3 className="font-medium text-gray-700">Taille: {size}</h3>
+            {colors.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-600">Ajouter des matériaux et leurs prix pour cette taille</p>
-                <div className="flex gap-2">
-                  <Input
-                    label=""
-                    placeholder="ex. Coton, Soie..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const input = (e.target as HTMLInputElement).value.trim();
-                        if (input) {
-                          setSizeMaterialPricing((prev) => ({
-                            ...prev,
-                            [size]: {
-                              ...(prev[size] ?? {}),
-                              [input]: "",
-                            },
-                          }));
-                          (e.target as HTMLInputElement).value = "";
-                        }
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-              {(sizeMaterialPricing[size] && Object.keys(sizeMaterialPricing[size]).length > 0) && (
-                <div className="space-y-2 border-t border-gray-100 pt-3">
-                  {Object.entries(sizeMaterialPricing[size] ?? {}).map(([material]) => (
-                    <div key={material} className="grid grid-cols-[150px_1fr_50px] gap-2 items-center">
-                      <span className="text-sm font-medium text-gray-700">{material}</span>
+                {colors.map((colorId) => {
+                  const color = allColorsList.find(c => c.id === colorId);
+                  if (!color) return null;
+                  return (
+                    <div key={color.id} className="grid grid-cols-[40px_140px_1fr] gap-2 items-center">
+                      <span className="w-6 h-6 rounded-full border border-gray-300 flex-shrink-0" style={{ backgroundColor: color.hex }} />
+                      <span className="text-sm font-medium text-gray-700">{color.nameFr}</span>
                       <Input
                         label=""
                         type="number"
                         step="0.01"
                         min="0"
-                        value={sizeMaterialPricing[size]?.[material] ?? ""}
+                        value={materialPricing[color.id] ?? ""}
+                        onChange={(e) =>
+                          setMaterialPricing((prev) => ({
+                            ...prev,
+                            [color.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="Prix (DT) — vide = non disponible"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(pricingMode === "direct" || pricingMode === "material" || pricingMode === "size_material") && (
+          <ColorMultiSelect
+            label="Couleurs (appuyer Entrée pour valider)"
+            value={colors}
+            onChange={setColors}
+          />
+        )}
+      </section>
+
+      {/* ── Size Color Pricing ── */}
+      {pricingMode === "size_material" && sizes.length > 0 && (
+        <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-800">Prix par Taille & Couleur</h2>
+          {sizes.map((size) => (
+            <div key={size} className="border border-gray-100 rounded-lg p-4 space-y-3">
+              <h3 className="font-medium text-gray-700">Taille: {size}</h3>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Prix par couleur pour cette taille</p>
+                {colors.map((colorId) => {
+                  const color = allColorsList.find(c => c.id === colorId);
+                  if (!color) return null;
+                  return (
+                    <div key={color.id} className="grid grid-cols-[40px_140px_1fr] gap-2 items-center">
+                      <span className="w-6 h-6 rounded-full border border-gray-300" style={{ backgroundColor: color.hex }} />
+                      <span className="text-sm text-gray-700">{color.nameFr}</span>
+                      <Input
+                        label=""
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={sizeMaterialPricing[size]?.[color.id] ?? ""}
                         onChange={(e) =>
                           setSizeMaterialPricing((prev) => ({
                             ...prev,
                             [size]: {
                               ...(prev[size] ?? {}),
-                              [material]: e.target.value,
+                              [color.id]: e.target.value,
                             },
                           }))
                         }
-                        placeholder="Prix (DT)"
+                        placeholder="Prix (DT) — vide = non disponible"
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSizeMaterialPricing((prev) => {
-                            const next = { ...prev };
-                            delete next[size][material];
-                            if (Object.keys(next[size]).length === 0) delete next[size];
-                            return next;
-                          });
-                        }}
-                        className="text-red-500 hover:text-red-700 text-sm font-bold"
-                      >
-                        ✕
-                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
           ))}
         </section>

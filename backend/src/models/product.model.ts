@@ -15,6 +15,7 @@ interface ProductAttributes {
     discount?: number;
     sizes?: string[];
     colors?: string[];
+    sizePricing?: Record<string, { price?: number; discount?: number }>;
     sizeMaterialPricing?: Record<string, Record<string, number>>;
     images?: string[];
     categoryId?: string;
@@ -39,6 +40,7 @@ export class Product extends Model<ProductAttributes, ProductCreationAttributes>
     declare discount?: number;
     declare sizes?: string[];
     declare colors?: string[];
+    declare sizePricing?: Record<string, { price?: number; discount?: number }>;
     declare sizeMaterialPricing?: Record<string, Record<string, number>>;
     declare images?: string[];
     declare categoryId?: string;
@@ -74,6 +76,8 @@ Product.init(
         discount: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
         sizes: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
         colors: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
+        sizePricing: { type: DataTypes.JSONB, allowNull: true },
+        sizeMaterialPricing: { type: DataTypes.JSONB, allowNull: true },
         images: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
         categoryId: { type: DataTypes.UUID, allowNull: true },
         manualVariants: { type: DataTypes.BOOLEAN, defaultValue: false },

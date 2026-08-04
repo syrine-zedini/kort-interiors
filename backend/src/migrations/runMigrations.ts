@@ -32,6 +32,14 @@ const REQUIRED_COLUMNS: ColumnSpec[] = [
   },
   {
     table: "products",
+    column: "sizePricing",
+    definition: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+  },
+  {
+    table: "products",
     column: "code",
     definition: {
       type: DataTypes.STRING(100),
@@ -306,6 +314,16 @@ const REQUIRED_COLUMNS: ColumnSpec[] = [
     definition: {
       type: DataTypes.STRING(50),
       allowNull: true,
+    },
+  },
+  // ─── Promotions: taille ciblée ──────────────────────────────────────────────
+  {
+    table: "promotions",
+    column: "applicableSizes",
+    definition: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      allowNull: true,
+      defaultValue: null,
     },
   },
 ];

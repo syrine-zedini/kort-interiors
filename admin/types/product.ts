@@ -45,6 +45,7 @@ export interface Product {
   discount?: number;
   sizes?: string[];
   colors?: string[];
+  sizePricing?: Record<string, { price?: number; discount?: number }>;
   sizeMaterialPricing?: Record<string, Record<string, number>>;
   images?: string[];
   categoryId?: string;
@@ -88,10 +89,12 @@ export interface CreateProductPayload {
   description?: string;
   sizes?: string[];
   colors?: string[];
+  price?: number | null;
+  discount?: number | null;
   prices?: number[];
   discounts?: number[];
-  sizePricing?: Record<string, { price?: number; discount?: number }>;
-  sizeMaterialPricing?: Record<string, Record<string, number>>;
+  sizePricing?: Record<string, { price?: number; discount?: number }> | null;
+  sizeMaterialPricing?: Record<string, Record<string, number>> | null;
   images?: string[];
   variantImages?: Record<string, string[]>;
   categoryId?: string;

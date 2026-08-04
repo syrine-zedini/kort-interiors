@@ -11,7 +11,9 @@ export interface Promotion {
   productId?: string | null;
   categoryId?: string | null;
   subCategoryId?: string | null;
-  product?: { id: string; name: string; slug?: string; images?: string[]; categoryId?: string };
+  /** Sizes this promotion is restricted to. Empty/null = all sizes. */
+  applicableSizes?: string[] | null;
+  product?: { id: string; name: string; slug?: string; images?: string[]; categoryId?: string; sizes?: string[] };
   category?: { id: string; name: string; slug?: string };
   subCategory?: { id: string; name: string; slug?: string };
   createdAt: string;
@@ -32,6 +34,7 @@ export interface PromotionFiltersOptions {
     slug?: string;
     images?: string[];
     categoryId?: string;
+    sizes?: string[];
   }>;
   categories: PromotionFilterCategory[];
 }
@@ -46,4 +49,6 @@ export interface CreatePromotionPayload {
   productId?: string | null;
   categoryId?: string | null;
   subCategoryId?: string | null;
+  /** Restrict to specific sizes. Null or empty = all sizes. */
+  applicableSizes?: string[] | null;
 }

@@ -75,6 +75,7 @@ export interface Product {
     details?: { key: string; value: string }[];
     isDetailsEnabled?: boolean;
     styles?: string[];
+    sizePricing?: Record<string, { price?: number; discount?: number }>;
     variants?: ProductVariant[];
     items?: ProductItem[];
     promotion?: Promotion | null;

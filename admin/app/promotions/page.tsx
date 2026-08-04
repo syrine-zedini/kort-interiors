@@ -33,6 +33,7 @@ export default function PromotionsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [subCategoryId, setSubCategoryId] = useState("");
   const [productId, setProductId] = useState("");
+  const [applicableSizes, setApplicableSizes] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,6 +104,7 @@ export default function PromotionsPage() {
       setCategoryId("");
       setSubCategoryId("");
       setProductId("");
+      setApplicableSizes([]);
       setIsActive(true);
       setFormError(null);
     },
@@ -113,7 +115,10 @@ export default function PromotionsPage() {
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deletePromotion(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["promotions"] }),
+    onSuccess: () => {
+      toast.success("Promotion supprimée avec succès!");
+      qc.invalidateQueries({ queryKey: ["promotions"] });
+    },
   });
 
   // Pagination
@@ -163,6 +168,7 @@ export default function PromotionsPage() {
       productId: productId || null,
       categoryId: categoryId || null,
       subCategoryId: subCategoryId || null,
+      applicableSizes: applicableSizes.length > 0 ? applicableSizes : null,
     });
   };
 
@@ -241,13 +247,70 @@ export default function PromotionsPage() {
               <label className="text-sm font-medium text-gray-700">Produit</label>
               <Select
                 value={productId}
-                onChange={(e) => setProductId(e.target.value)}
+                onChange={(e) => {
+                  setProductId(e.target.value);
+                  setApplicableSizes([]); // reset sizes when product changes
+                }}
                 options={productOptions}
                 placeholder="Tous"
                 disabled={loadingOptions}
               />
             </div>
           </div>
+
+          {/* ── Tailles disponibles pour la promotion ── */}
+          {(() => {
+            const selectedProduct = productId
+              ? (options?.products ?? []).find((p) => p.id === productId)
+              : null;
+            const availSizes = selectedProduct?.sizes ?? [];
+            if (!productId || availSizes.length === 0) return null;
+            const toggleSize = (s: string) =>
+              setApplicableSizes((prev) =>
+                prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+              );
+            return (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Tailles concernées
+                  <span className="ml-2 text-xs text-gray-400 font-normal">(aucune sélection = toutes les tailles)</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {availSizes.map((size) => {
+                    const active = applicableSizes.includes(size);
+                    return (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => toggleSize(size)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                          active
+                            ? "bg-amber-500 text-white border-amber-500 shadow-sm"
+                            : "bg-white text-gray-600 border-gray-300 hover:border-amber-400 hover:text-amber-600"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    );
+                  })}
+                  {applicableSizes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setApplicableSizes([])}
+                      className="px-3 py-1.5 rounded-lg text-sm text-gray-400 border border-dashed border-gray-300 hover:text-red-500 hover:border-red-300 transition-all"
+                    >
+                      ✕ Réinitialiser
+                    </button>
+                  )}
+                </div>
+                {applicableSizes.length > 0 && (
+                  <p className="text-xs text-amber-600">
+                    Promotion appliquée uniquement aux tailles : <strong>{applicableSizes.join(", ")}</strong>
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">Recherche produit</label>
@@ -357,6 +420,15 @@ export default function PromotionsPage() {
                     <td className="px-5 py-3 font-medium text-gray-800">{promotion.name}</td>
                     <td className="px-5 py-3 text-gray-600">
                       {promotion.product?.name ?? promotion.subCategory?.name ?? promotion.category?.name ?? "-"}
+                      {promotion.applicableSizes && promotion.applicableSizes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {promotion.applicableSizes.map((s) => (
+                            <span key={s} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-gray-700">
                       {promotion.discountType === "percentage"
@@ -389,9 +461,12 @@ export default function PromotionsPage() {
                     <td className="px-5 py-3 text-right">
                       <button
                         onClick={() => {
-                          if (confirm("Supprimer cette promotion ?")) {
-                            deleteMut.mutate(promotion.id);
-                          }
+                          toast("Supprimer cette promotion ?", {
+                            action: {
+                              label: "Supprimer",
+                              onClick: () => deleteMut.mutate(promotion.id),
+                            },
+                          });
                         }}
                         disabled={deleteMut.isPending}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"

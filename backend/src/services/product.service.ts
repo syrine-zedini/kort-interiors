@@ -7,6 +7,80 @@ import { generateSlug, isUUID } from '../helpers/slug';
 import * as joolanService from "./joolan.service";
 import { getCategoryById } from "./categories.service";
 import { getSiteSettings } from "../config/siteSettings";
+import { getApplicablePromotion, calculateFinalPrice } from './promotion.service';
+
+export const enrichProductWithPromotion = async (product: any) => {
+    if (!product) return product;
+    const plainProduct = typeof product.toJSON === 'function' ? product.toJSON() : product;
+
+    if (plainProduct.id && isUUID(plainProduct.id)) {
+        const promotion = await getApplicablePromotion(plainProduct as any);
+        plainProduct.promotion = promotion ? {
+            id: promotion.id,
+            name: promotion.name,
+            discountType: promotion.discountType,
+            discountValue: promotion.discountValue,
+            applicableSizes: promotion.applicableSizes ?? null,
+        } : null;
+
+        // Helper: does this promotion apply to a specific size?
+        const promoAppliesToSize = (size: string) => {
+            if (!promotion) return false;
+            if (!promotion.applicableSizes || promotion.applicableSizes.length === 0) return true;
+            return promotion.applicableSizes.includes(size);
+        };
+
+        const basePrice = Number(plainProduct.price) || 0;
+        // Base price promo only if no size restriction (or the product has no sizes)
+        const basePricePromo = (!promotion || !promotion.applicableSizes || promotion.applicableSizes.length === 0) ? promotion : null;
+        const basePricing = calculateFinalPrice(basePrice, basePricePromo);
+        plainProduct.pricing = basePricing;
+
+        // Calculate size pricing with promotion (respecting applicableSizes)
+        if (plainProduct.sizePricing && typeof plainProduct.sizePricing === 'object') {
+            plainProduct.sizePricingWithPromotion = {};
+            for (const [size, pricing] of Object.entries(plainProduct.sizePricing)) {
+                const sprice = Number((pricing as any).price) || 0;
+                // Apply promotion only if this size is in applicableSizes (or no restriction)
+                const effectivePromo = promoAppliesToSize(size) ? promotion : null;
+                const sPricing = calculateFinalPrice(sprice, effectivePromo);
+                plainProduct.sizePricingWithPromotion[size] = {
+                    basePrice: sprice,
+                    finalPrice: sPricing.finalPrice,
+                    savingsAmount: sPricing.savingsAmount,
+                    savingsPercentage: sPricing.savingsPercentage,
+                };
+            }
+        }
+
+        // Calculate size-material combinations with promotion (respecting applicableSizes)
+        if (plainProduct.sizeMaterialPricing && typeof plainProduct.sizeMaterialPricing === 'object') {
+            plainProduct.sizeMaterialPricingWithPromotion = {};
+            for (const [size, materials] of Object.entries(plainProduct.sizeMaterialPricing)) {
+                plainProduct.sizeMaterialPricingWithPromotion[size] = {};
+                if (typeof materials === 'object' && materials !== null) {
+                    for (const [material, price] of Object.entries(materials as Record<string, number>)) {
+                        const materialPrice = Number(price) || 0;
+                        const effectivePromo = promoAppliesToSize(size) ? promotion : null;
+                        const materialPricing = calculateFinalPrice(materialPrice, effectivePromo);
+                        plainProduct.sizeMaterialPricingWithPromotion[size][material] = {
+                            basePrice: materialPrice,
+                            finalPrice: materialPricing.finalPrice,
+                            savingsAmount: materialPricing.savingsAmount,
+                            savingsPercentage: materialPricing.savingsPercentage,
+                        };
+                    }
+                }
+            }
+        }
+    }
+    return plainProduct;
+};
+
+export const enrichProductsWithPromotion = async (products: any[]) => {
+    return await Promise.all(products.map(p => enrichProductWithPromotion(p)));
+};
+
 
 /** Returns all products from a local PostgreSQL category in the same shape as OOPOS. */
 export const getLocalCategoryVariants = async (categoryId: string) => {
@@ -23,7 +97,7 @@ export const getLocalCategoryVariants = async (categoryId: string) => {
 
     const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? '';
 
-    return products.map((p: any) => ({
+    const formatted = products.map((p: any) => ({
         id: p.id,
         code: p.code ?? '',
         name: p.name ?? '',
@@ -36,6 +110,8 @@ export const getLocalCategoryVariants = async (categoryId: string) => {
         slug: p.slug ?? '',
         mainProductId: p.id,
         variantId: p.id,
+        sizePricing: p.sizePricing,
+        sizeMaterialPricing: p.sizeMaterialPricing,
         variants: (p.variants ?? []).map((v: any) => ({
             id: v.id,
             sku: v.sku ?? '',
@@ -46,6 +122,8 @@ export const getLocalCategoryVariants = async (categoryId: string) => {
             images: v.images ?? [],
         })),
     }));
+
+    return await enrichProductsWithPromotion(formatted);
 };
 
 /** Returns true if a product SKU is active (Actif = 1, "1", or true). */
@@ -185,6 +263,8 @@ export const getProductsByCategoryId = async (categoryId: string, showAll: boole
                 actif: p.visible ? 1 : 0,
                 sizes: p.sizes || [],
                 colors: p.colors || [],
+                sizePricing: p.sizePricing,
+                sizeMaterialPricing: p.sizeMaterialPricing,
                 variants: (p.variants ?? []).map((v: any) => ({
                     id: v.id,
                     sku: v.sku ?? '',
@@ -200,7 +280,7 @@ export const getProductsByCategoryId = async (categoryId: string, showAll: boole
             console.error('[getProductsByCategoryId] Error fetching local products:', e.message);
         }
 
-        return [...localProductsFormatted, ...products];
+        return await enrichProductsWithPromotion([...localProductsFormatted, ...products]);
         
     } catch (error: any) {
         console.error('[getProductsByCategoryId] Error:', error.message);
@@ -533,7 +613,7 @@ export const getAllProducts = async (search?: string, filters?: { color?: string
         }
 
         // Combine both local database and OOPOS products
-        return [...localProducts, ...ooposProductsList];
+        return await enrichProductsWithPromotion([...localProducts, ...ooposProductsList]);
     } catch (error: any) {
         console.error('[getAllProducts] Error:', error.message);
         throw error;
@@ -577,12 +657,12 @@ export const getProductById = async (id: string) => {
     // UUID lookup
     if (isUUID(id)) {
         const product = await Product.findByPk(id, { include: [variantInclude, itemInclude] });
-        if (product) return product;
+        if (product) return await enrichProductWithPromotion(product);
     }
 
     // Slug lookup (local products)
     const bySlug = await Product.findOne({ where: { slug: id }, include: [variantInclude, itemInclude] });
-    if (bySlug) return bySlug;
+    if (bySlug) return await enrichProductWithPromotion(bySlug);
 
     // Fallback: try as OOPOS code
     try {
@@ -593,7 +673,7 @@ export const getProductById = async (id: string) => {
 };
 
 export const getProductsByCode = async (code: string, showAll: boolean = false) => {
-    return [await getProductByCode(code, showAll)];
+    return await enrichProductsWithPromotion([await getProductByCode(code, showAll)]);
 };
 
 export const createProduct = async (data: any) => {
@@ -698,6 +778,7 @@ export const updateProduct = async (id: string, data: any) => {
     if (data.isDetailsEnabled !== undefined) product.isDetailsEnabled = data.isDetailsEnabled;
     if (data.styles !== undefined) product.styles = data.styles;
     if (data.manualVariants !== undefined) product.manualVariants = data.manualVariants;
+    if (data.sizePricing !== undefined) product.sizePricing = data.sizePricing;
     if (data.sizeMaterialPricing !== undefined) product.sizeMaterialPricing = data.sizeMaterialPricing;
     if (data.productType !== undefined) product.productType = data.productType;
 

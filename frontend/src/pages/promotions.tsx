@@ -35,7 +35,9 @@ export default function PromotionsPage() {
     const now = new Date();
     return promotions.filter((p) => {
       const start = new Date(p.startDate);
-      const end = new Date(p.endDate);
+      const endRaw = new Date(p.endDate);
+      // Treat end date as end-of-day to include the full last day
+      const end = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate(), 23, 59, 59, 999);
       return p.isActive && now >= start && now <= end;
     });
   }, [promotions]);

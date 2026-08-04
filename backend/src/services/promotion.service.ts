@@ -21,6 +21,8 @@ export interface CreatePromotionPayload {
   productId?: string | null;
   categoryId?: string | null;
   subCategoryId?: string | null;
+  /** Restrict to specific sizes. Null or empty = applies to all sizes. */
+  applicableSizes?: string[] | null;
 }
 
 export interface UpdatePromotionPayload extends Partial<CreatePromotionPayload> {}
@@ -63,7 +65,7 @@ export async function getPromotionFiltersOptions(search = "") {
   const [products, categories] = await Promise.all([
     Product.findAll({
       where: productsWhere,
-      attributes: ["id", "name", "slug", "images", "categoryId"],
+      attributes: ["id", "name", "slug", "images", "categoryId", "sizes"],
       order: [["name", "ASC"]],
     }),
     ProductCategory.findAll({
@@ -116,6 +118,7 @@ export async function createPromotion(payload: CreatePromotionPayload) {
 
   const startDate = new Date(payload.startDate);
   const endDate = new Date(payload.endDate);
+  endDate.setHours(23, 59, 59, 999);
   validatePromotionDates(startDate, endDate);
 
   if (payload.discountType === "percentage" && payload.discountValue > 100) {
@@ -132,6 +135,10 @@ export async function createPromotion(payload: CreatePromotionPayload) {
     productId: payload.productId ?? null,
     categoryId: payload.categoryId ?? null,
     subCategoryId: payload.subCategoryId ?? null,
+    applicableSizes:
+      Array.isArray(payload.applicableSizes) && payload.applicableSizes.length > 0
+        ? payload.applicableSizes
+        : null,
   });
 
   const withRelations = await Promotion.findByPk(created.id, { include: includeRelations });
@@ -144,6 +151,9 @@ export async function updatePromotion(id: string, payload: UpdatePromotionPayloa
 
   const nextStart = payload.startDate ? new Date(payload.startDate) : promotion.startDate;
   const nextEnd = payload.endDate ? new Date(payload.endDate) : promotion.endDate;
+  if (payload.endDate) {
+    nextEnd.setHours(23, 59, 59, 999);
+  }
   validatePromotionDates(nextStart, nextEnd);
 
   const nextType = payload.discountType ?? promotion.discountType;
@@ -156,6 +166,12 @@ export async function updatePromotion(id: string, payload: UpdatePromotionPayloa
     ...payload,
     startDate: nextStart,
     endDate: nextEnd,
+    applicableSizes:
+      "applicableSizes" in payload
+        ? Array.isArray(payload.applicableSizes) && payload.applicableSizes.length > 0
+          ? payload.applicableSizes
+          : null
+        : promotion.applicableSizes,
   });
 
   return Promotion.findByPk(id, { include: includeRelations });
@@ -178,13 +194,23 @@ export function isPromotionActive(promotion: Promotion): boolean {
 }
 
 /**
- * Get the applicable promotion for a product
- * Checks product-specific promotions first, then category promotions
+ * Get the applicable promotion for a product.
+ * @param product  The product to find a promotion for.
+ * @param selectedSize  Optional size selected by the customer. Used to skip
+ *                      promotions whose applicableSizes don't include it.
  */
 export async function getApplicablePromotion(
-  product: Product
+  product: Product,
+  selectedSize?: string | null
 ): Promise<Promotion | null> {
   const now = new Date();
+
+  /** Returns true if the promo applies to the current selectedSize */
+  const sizeMatches = (p: Promotion): boolean => {
+    if (!p.applicableSizes || p.applicableSizes.length === 0) return true; // all sizes
+    if (!selectedSize) return true; // no size filter requested → show promo
+    return p.applicableSizes.includes(selectedSize);
+  };
 
   // Check for product-specific promotion
   const productPromotions = await Promotion.findAll({
@@ -195,16 +221,15 @@ export async function getApplicablePromotion(
     order: [["createdAt", "DESC"]],
   });
 
-  // Filter by date in JavaScript after fetching
   const activePromotion = productPromotions.find(p => {
     const startDate = new Date(p.startDate);
     const endDate = new Date(p.endDate);
-    return now >= startDate && now <= endDate;
+    return now >= startDate && now <= endDate && sizeMatches(p);
   });
 
   if (activePromotion) return activePromotion;
 
-  // Check for category/subcategory promotion
+  // Check for category/subcategory promotion (no size restriction on category promos)
   if (product.categoryId) {
     const categoryPromotions = await Promotion.findAll({
       where: {

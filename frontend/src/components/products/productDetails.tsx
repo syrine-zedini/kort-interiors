@@ -228,12 +228,32 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
         setCurrentImageIndex(0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedVariant, product.id]);
+    const sizes = useMemo(() => Array.from(new Set([
+        ...(product.sizes ?? []),
+        ...(product.variants?.map((v) => v.size).filter(Boolean) ?? [])
+    ])) as string[], [product.sizes, product.variants]);
+    const visibleSizes = sizes.filter((size) => size !== MATERIAL_ONLY_SIZE_KEY);
+    const effectiveSelectedSize =
+        (selectedSize && sizes.includes(selectedSize))
+            ? selectedSize
+            : (visibleSizes.length === 1 ? visibleSizes[0] : "");
 
-    const displayPrice = Number(selectedVariant?.price ?? product.price ?? 0);
-    const displayDiscount = Number(selectedVariant?.discount ?? product.discount ?? 0);
+    const sizePricingObj = effectiveSelectedSize && product.sizePricing?.[effectiveSelectedSize];
+    const sizePricingEntry = sizePricingObj && typeof sizePricingObj === 'object' ? sizePricingObj : undefined;
+    const displayPrice = Number(selectedVariant?.price ?? sizePricingEntry?.price ?? product.price ?? 0);
+    const displayDiscount = Number(selectedVariant?.discount ?? sizePricingEntry?.discount ?? product.discount ?? 0);
 
     const applyProductPromotion = (basePrice: number): number => {
         if (!product.promotion) return basePrice;
+        
+        // If the promotion is restricted to specific sizes, check if the current size is in them
+        const appSizes = (product.promotion as any).applicableSizes;
+        if (Array.isArray(appSizes) && appSizes.length > 0) {
+            if (!effectiveSelectedSize || !appSizes.includes(effectiveSelectedSize)) {
+                return basePrice; // Promo does not apply to this size
+            }
+        }
+
         const discountValue = Number(product.promotion.discountValue ?? 0);
         if (!Number.isFinite(discountValue) || discountValue <= 0) return basePrice;
         if (product.promotion.discountType === "percentage") {
@@ -244,46 +264,128 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
 
     // For variant-driven products, the selected variant price must win over product-level pricing.
     const selectedVariantHasOwnPrice = selectedVariant?.price != null;
+    
+    // Size-specific pricing with promotion from backend (if it exists)
+    const sizePricingWithPromo = effectiveSelectedSize && product.sizePricingWithPromotion?.[effectiveSelectedSize];
+    const sizePromotedPrice = sizePricingWithPromo && typeof sizePricingWithPromo === 'object' 
+        ? Number(sizePricingWithPromo.finalPrice)
+        : undefined;
+
     const variantOrProductCalculatedPrice = Math.max(0, displayPrice - displayDiscount);
     const variantOrProductPromotedPrice = applyProductPromotion(variantOrProductCalculatedPrice);
     const productLevelFinalPrice = Number(product.pricing?.finalPrice);
-    const basePriceBeforeMaterial =
-        !selectedVariantHasOwnPrice && Number.isFinite(productLevelFinalPrice)
-            ? productLevelFinalPrice
-            : variantOrProductPromotedPrice;
 
-    const sizes = Array.from(new Set(
-        product.variants?.map((v) => v.size).filter(Boolean) ?? []
-    )) as string[];
-    const visibleSizes = sizes.filter((size) => size !== MATERIAL_ONLY_SIZE_KEY);
-    const effectiveSelectedSize =
-        selectedSize || (sizes.length === 1 ? sizes[0] : "");
+    const appSizes = product.promotion?.applicableSizes;
+    const isPromoActiveForCurrentSize = !!(product.promotion && (
+        !Array.isArray(appSizes) || 
+        appSizes.length === 0 || 
+        (effectiveSelectedSize && appSizes.includes(effectiveSelectedSize))
+    ));
+    
+    const basePriceBeforeMaterial =
+        selectedVariantHasOwnPrice
+            ? variantOrProductPromotedPrice
+            : (Number.isFinite(sizePromotedPrice)
+                ? sizePromotedPrice!
+                : (effectiveSelectedSize
+                    ? variantOrProductPromotedPrice
+                    : (Number.isFinite(productLevelFinalPrice) ? productLevelFinalPrice : variantOrProductPromotedPrice)));
+
+    const colorMap = useMemo(() => allColors, [allColors]);
 
     // Get materials available for selected size and find the price
     // Use promotion-adjusted pricing if available, otherwise use original pricing
+    // sizeMaterialPricing keys are now color IDs (or material names for legacy)
     const materialsForSize =
         product.sizeMaterialPricingWithPromotion?.[effectiveSelectedSize] ??
         product.sizeMaterialPricing?.[effectiveSelectedSize] ??
         {};
+
+    // Check color-based pricing:
+    // 1) Simple color pricing: stored in sizeMaterialPricing["__material_only__"][colorId]
+    // 2) Size+color pricing: sizeMaterialPricing[size][colorId]
+    const colorKeyForPricing = selectedColorId || selectedMaterial;
+    const hasColorPricing = colorKeyForPricing && colorKeyForPricing in materialsForSize;
     const hasSelectedMaterial = selectedMaterial && selectedMaterial in materialsForSize;
 
-    // If using promotion-adjusted pricing, materialPrice is an object with pricing info; otherwise it's just a number
+    // Simple "prix par couleur" (no size): stored under __material_only__ key
+    const simpleMaterialPricing: Record<string, any> =
+        (product as any).sizeMaterialPricing?.["__material_only__"] ??
+        (product as any).sizeMaterialPricingWithPromotion?.["__material_only__"] ??
+        {};
+
+    // Helper: Find pricing for a selected color (checking either UUID ID or translated/literal color Name)
+    const findColorPrice = (pricingMap: Record<string, any>, colorId: string) => {
+        if (!colorId) return undefined;
+        if (pricingMap[colorId] !== undefined) return pricingMap[colorId];
+        // If query was color name (like Bleu Marine or bleu+marine) or mapped name
+        const meta = colorMap[colorId];
+        if (meta) {
+            const nameFrLower = meta.nameFr.toLowerCase().trim();
+            const foundKey = Object.keys(pricingMap).find(k => {
+                const kMeta = colorMap[k];
+                return (kMeta && kMeta.nameFr.toLowerCase().trim() === nameFrLower) || k.toLowerCase().trim() === nameFrLower;
+            });
+            if (foundKey) return pricingMap[foundKey];
+        }
+        // Fallback: search key case-insensitive
+        const lowerId = colorId.toLowerCase().trim();
+        const matchedKey = Object.keys(pricingMap).find(k => k.toLowerCase().trim() === lowerId || (colorMap[k] && colorMap[k].nameFr.toLowerCase().trim() === lowerId));
+        if (matchedKey) return pricingMap[matchedKey];
+        return undefined;
+    };
+
+    const simpleColorPrice = findColorPrice(simpleMaterialPricing, selectedColorId);
+    const sizeColorPrice = findColorPrice(materialsForSize, selectedColorId);
+
     let finalPrice = Number.isFinite(basePriceBeforeMaterial) ? basePriceBeforeMaterial : 0;
-    if (hasSelectedMaterial) {
+    if (simpleColorPrice !== undefined && simpleColorPrice !== null && simpleColorPrice !== "") {
+        // Simple "prix par couleur" mode
+        if (typeof simpleColorPrice === 'object' && 'finalPrice' in simpleColorPrice) {
+            finalPrice = Number(simpleColorPrice.finalPrice ?? basePriceBeforeMaterial);
+        } else {
+            finalPrice = Number(simpleColorPrice) || basePriceBeforeMaterial;
+        }
+    } else if (sizeColorPrice !== undefined && sizeColorPrice !== null && sizeColorPrice !== "") {
+        if (typeof sizeColorPrice === 'object' && 'finalPrice' in sizeColorPrice) {
+            finalPrice = Number(sizeColorPrice.finalPrice ?? basePriceBeforeMaterial);
+        } else {
+            finalPrice = Number(sizeColorPrice) || basePriceBeforeMaterial;
+        }
+    } else if (hasColorPricing) {
+        const colorPrice = materialsForSize[colorKeyForPricing!];
+        if (typeof colorPrice === 'object' && 'finalPrice' in colorPrice) {
+            finalPrice = Number((colorPrice as { finalPrice?: number | string }).finalPrice ?? basePriceBeforeMaterial);
+        } else {
+            finalPrice = Number(colorPrice) || basePriceBeforeMaterial;
+        }
+    } else if (hasSelectedMaterial) {
         const materialPrice = materialsForSize[selectedMaterial];
         if (typeof materialPrice === 'object' && 'finalPrice' in materialPrice) {
-            // Promotion-adjusted pricing
             finalPrice = Number((materialPrice as { finalPrice?: number | string }).finalPrice ?? basePriceBeforeMaterial);
         } else {
-            // Original pricing (just a number)
             finalPrice = Number(materialPrice) || basePriceBeforeMaterial;
         }
     }
     finalPrice = Number.isFinite(finalPrice) ? finalPrice : 0;
     const savingsAmount = Math.max(0, displayPrice - finalPrice);
 
+    // Detect pricing mode from product data
+    // "size-only" mode: has sizePricing populated but NO sizeMaterialPricing
+    const isSizeOnlyPricingMode = useMemo(() => {
+        const hasSizePricing = product.sizePricing && Object.keys(product.sizePricing).length > 0;
+        const hasMaterialPricing = product.sizeMaterialPricing && Object.keys(product.sizeMaterialPricing).length > 0;
+        // Also check across related products
+        const anyRelatedHasMaterial = relatedProducts.some((p: any) =>
+            p.sizeMaterialPricing && Object.keys(p.sizeMaterialPricing).length > 0
+        );
+        return hasSizePricing && !hasMaterialPricing && !anyRelatedHasMaterial;
+    }, [product.sizePricing, product.sizeMaterialPricing, relatedProducts]);
+
     // Build color options from all related products (same code) to show all available colors
+    // If in size-only pricing mode, there are no color options to show
     const getAllColorIds = () => {
+        if (isSizeOnlyPricingMode) return [];
         const colorSet = new Set<string>();
         (relatedProducts.length > 0 ? relatedProducts : [product]).forEach((p) => {
             // Add product-level colors
@@ -301,8 +403,6 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
     };
 
     const rawColorIds = getAllColorIds();
-
-    const colorMap = useMemo(() => allColors, [allColors]);
 
     // Build set of colors that have images attached (from produits_couleurs SQL via backend)
     const colorsWithImages = useMemo(() => {
@@ -349,11 +449,15 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [colorsWithImages]);
 
-    const materials = product.sizeMaterialPricingWithPromotion?.[effectiveSelectedSize]
+    // materials = old system (text keys like "Coton"). If keys look like UUIDs (color IDs), treat as empty
+    const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+    const rawMaterialKeys = product.sizeMaterialPricingWithPromotion?.[effectiveSelectedSize]
         ? Object.keys(product.sizeMaterialPricingWithPromotion[effectiveSelectedSize])
         : (product.sizeMaterialPricing?.[effectiveSelectedSize]
             ? Object.keys(product.sizeMaterialPricing[effectiveSelectedSize])
             : []);
+    // Hide material selector if keys are color IDs (new system)
+    const materials = rawMaterialKeys.filter(k => !isUuid(k));
 
     // ✅ CORRECTION: Derive selected color name for display (now it's a string)
     const selectedColorMeta = selectedColorId ? colorMap[selectedColorId] : undefined;
@@ -399,7 +503,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                         setSelectedColorId(matchByName.id);
                         // Also select matching variant
                         const matchingVariant = product.variants?.find(
-                            (v) => v.color === matchByName.id && (!initialSize || v.size === initialSize)
+                            (v) => v.color === matchByName.id && (!initialSize || String(v.size).toLowerCase() === String(initialSize).toLowerCase())
                         ) ?? product.variants?.find((v) => v.color === matchByName.id);
                         if (matchingVariant) setSelectedVariant(matchingVariant);
                     } else {
@@ -408,11 +512,10 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                         if (matchById) {
                             setSelectedColorId(matchById.id);
                             const matchingVariant = product.variants?.find(
-                                (v) => v.color === matchById.id && (!initialSize || v.size === initialSize)
+                                (v) => v.color === matchById.id && (!initialSize || String(v.size).toLowerCase() === String(initialSize).toLowerCase())
                             ) ?? product.variants?.find((v) => v.color === matchById.id);
                             if (matchingVariant) setSelectedVariant(matchingVariant);
                         } else {
-                            // ✅ AJOUTÉ: Try matching as a color name string
                             setSelectedColorId(initialColor);
                             const matchingVariant = product.variants?.find(
                                 (v) => v.color?.toLowerCase() === initialColor.toLowerCase()
@@ -423,19 +526,24 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                     setInitialColorResolved(true);
                 }
 
-                // Resolve initialSize if provided (select matching variant)
-                if (initialSize && !initialColor) {
-                    const matchingVariant = product.variants?.find((v) => v.size === initialSize);
-                    if (matchingVariant) {
-                        setSelectedVariant(matchingVariant);
-                        if (matchingVariant.color) setSelectedColorId(matchingVariant.color);
+                // Resolve initialSize if provided
+                if (initialSize) {
+                    const normalizedSize = String(initialSize).toLowerCase().trim();
+                    const matchedSize = sizes.find(s => String(s).toLowerCase().trim() === normalizedSize);
+                    if (matchedSize) {
+                        setSelectedSize(matchedSize);
+                        const matchingVariant = product.variants?.find((v) => String(v.size).toLowerCase().trim() === normalizedSize);
+                        if (matchingVariant) {
+                            setSelectedVariant(matchingVariant);
+                            if (matchingVariant.color) setSelectedColorId(matchingVariant.color);
+                        }
                     }
                 }
             } catch (e) {
-                // fail silently; UI will just use neutral placeholders
+                // fail silently
             }
         })();
-    }, []);
+    }, [initialColor, initialSize, product.variants, sizes]);
 
     useEffect(() => {
         if (!product.items?.length) return;
@@ -515,10 +623,19 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
     };
 
     const hasSizeSelector = visibleSizes.length > 0;
-    const requiresMaterialSelection = materials.length > 0;
+    const requiresMaterialSelection = materials.length > 0; // only legacy text-based materials
+    // Color-based pricing: price shown automatically when color selected
+    const hasColorBasedPricing = !!(selectedColorId && (
+        simpleMaterialPricing[selectedColorId] !== undefined ||
+        (effectiveSelectedSize && materialsForSize[selectedColorId] !== undefined)
+    ));
     const canDisplayMainPrice =
         (!hasSizeSelector && !requiresMaterialSelection) ||
-        (effectiveSelectedSize && (!requiresMaterialSelection || Boolean(selectedMaterial)));
+        (effectiveSelectedSize && !requiresMaterialSelection) ||
+        (effectiveSelectedSize && requiresMaterialSelection && Boolean(selectedMaterial)) ||
+        hasColorBasedPricing ||
+        // No color pricing defined at all → show base price
+        (Object.keys(simpleMaterialPricing).length === 0 && !requiresMaterialSelection);
 
     return (
         <div style={{
@@ -755,13 +872,13 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                     {/* Price */}
                     {canDisplayMainPrice ? (
                         <div style={{ marginBottom: 24 }}>
-                            {(displayDiscount > 0 || product.promotion) && (
+                            {(displayDiscount > 0 || isPromoActiveForCurrentSize) && (
                                 <div style={{ marginBottom: 12 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                         <span style={{ fontSize: 14, color: "#888", textDecoration: "line-through" }}>
                                             {displayPrice.toFixed(2)}DT
                                         </span>
-                                        {product.promotion && (
+                                        {isPromoActiveForCurrentSize && product.promotion && (
                                             <span style={{
                                                 display: "inline-block",
                                                 background: "#c0392b",
@@ -785,7 +902,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                                     )}
                                 </div>
                             )}
-                            <span style={{ fontSize: 28, fontWeight: 400, color: (displayDiscount > 0 || product.promotion) ? "#c0392b" : "#1a1a1a" }}>
+                            <span style={{ fontSize: 28, fontWeight: 400, color: (displayDiscount > 0 || isPromoActiveForCurrentSize) ? "#c0392b" : "#1a1a1a" }}>
                                 {(finalPrice * quantity).toFixed(2)}DT
                             </span>
                         </div>
@@ -1377,7 +1494,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
             {/* Similar Products */}
             <SimilarProducts 
                 categoryId={product.categoryId} 
-                currentProductId={product.id} 
+                currentProductId={product.id ?? ""} 
                 categorySlug={categorySlug} 
             />
 
