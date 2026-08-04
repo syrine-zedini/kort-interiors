@@ -34,6 +34,32 @@ router.get('/local-categories', async (req, res) => {
   }
 });
 
+router.get('/debug-db', async (req, res) => {
+  try {
+    const productsColumns = await sequelize.query(
+      "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'products'",
+      { type: QueryTypes.SELECT }
+    );
+    const promotionsColumns = await sequelize.query(
+      "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'promotions'",
+      { type: QueryTypes.SELECT }
+    );
+    
+    // Also fetch sample product
+    const sampleProduct = await Product.findOne({
+      order: [['createdAt', 'DESC']]
+    });
+    
+    res.json({
+      productsColumns,
+      promotionsColumns,
+      sampleProduct
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const ALLOWED_TABLES: Record<string, string> = {
   products: 'products',
   product_categories: 'product_categories',
@@ -168,8 +194,14 @@ router.put('/local-products/:id', adminAuth, async (req, res) => {
   if (visible !== undefined) (product as any).visible = Boolean(visible);
   if (details !== undefined) (product as any).details = Array.isArray(details) ? details : [];
   if (isDetailsEnabled !== undefined) (product as any).isDetailsEnabled = Boolean(isDetailsEnabled);
-  if (sizePricing !== undefined) (product as any).sizePricing = typeof sizePricing === 'object' ? sizePricing : null;
-  if (sizeMaterialPricing !== undefined) (product as any).sizeMaterialPricing = typeof sizeMaterialPricing === 'object' ? sizeMaterialPricing : null;
+  if (sizePricing !== undefined) {
+    (product as any).sizePricing = typeof sizePricing === 'object' ? sizePricing : null;
+    product.changed('sizePricing', true);
+  }
+  if (sizeMaterialPricing !== undefined) {
+    (product as any).sizeMaterialPricing = typeof sizeMaterialPricing === 'object' ? sizeMaterialPricing : null;
+    product.changed('sizeMaterialPricing', true);
+  }
   if (manualVariants !== undefined) (product as any).manualVariants = Boolean(manualVariants);
   if (categoryId !== undefined) {
     if (categoryId && !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(categoryId)) {

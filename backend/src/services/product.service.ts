@@ -778,8 +778,14 @@ export const updateProduct = async (id: string, data: any) => {
     if (data.isDetailsEnabled !== undefined) product.isDetailsEnabled = data.isDetailsEnabled;
     if (data.styles !== undefined) product.styles = data.styles;
     if (data.manualVariants !== undefined) product.manualVariants = data.manualVariants;
-    if (data.sizePricing !== undefined) product.sizePricing = data.sizePricing;
-    if (data.sizeMaterialPricing !== undefined) product.sizeMaterialPricing = data.sizeMaterialPricing;
+    if (data.sizePricing !== undefined) {
+        product.sizePricing = data.sizePricing;
+        product.changed('sizePricing', true);
+    }
+    if (data.sizeMaterialPricing !== undefined) {
+        product.sizeMaterialPricing = data.sizeMaterialPricing;
+        product.changed('sizeMaterialPricing', true);
+    }
     if (data.productType !== undefined) product.productType = data.productType;
 
     await product.save();
