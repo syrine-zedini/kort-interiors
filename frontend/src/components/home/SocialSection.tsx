@@ -49,6 +49,16 @@ export default function SocialSection() {
       .finally(() => setLoading(false));
   }, []);
 
+  const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "http://localhost:6002";
+
+  const resolveMediaUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("http://localhost:6002")) {
+      return url.replace("http://localhost:6002", IMAGE_BASE);
+    }
+    return url;
+  };
+
   const items = posts.length > 0
     ? posts
     : Array.from({ length: 6 }, (_, i) => ({ 
@@ -99,7 +109,7 @@ export default function SocialSection() {
                 aria-label={caption}
               >
                 <img
-                  src={post.media_url}
+                  src={resolveMediaUrl(post.media_url)}
                   alt={caption}
                   style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.5s ease" }}
                   className="social-img"
