@@ -27,9 +27,9 @@ export const getFilePath = async (fileName: string) => {
         where: {
             fileName
         }
-    })
+    });
     if (!file)
-        throw new Error("File not saved on database")
+        throw new Error("File not saved on database");
     const filePath = path.join(__dirname, file.url);
     if (!fs.existsSync(filePath)) {
         throw new Error("File not found");

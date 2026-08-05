@@ -14,6 +14,8 @@ type PromoCategoryCard = {
   image?: string;
   promotionsCount: number;
   maxDiscount: number;
+  productSlug?: string;   // for direct product link
+  categorySlug?: string; // for category link
 };
 
 export default function OffresSection() {
@@ -104,6 +106,8 @@ export default function OffresSection() {
           image,
           promotionsCount: 1,
           maxDiscount: p.discountType === "percentage" ? discount : 0,
+          productSlug: p.product?.slug ?? p.product?.id ?? undefined,
+          categorySlug: category?.slug ?? category?.id ?? undefined,
         });
       } else {
         current.promotionsCount += 1;
@@ -153,9 +157,16 @@ export default function OffresSection() {
               const bg = i % 2 === 0 ? "#0e0d0c" : "#f5f0e8";
               const accent = i % 2 === 0 ? "#fff" : "#0e0d0c";
               const isDark = accent === "#fff";
+              // Build the correct destination link
+              const href = o.id.startsWith("product-")
+                ? `/products/${o.categorySlug ?? "general"}/${o.productSlug ?? o.id.replace("product-", "")}`
+                : o.categorySlug
+                ? `/products/${o.categorySlug}`
+                : "/promotions";
+
               return (
                 <StaggerItem key={o.id}>
-                  <Link href="/promotions" style={{ textDecoration: "none", display: "block" }}>
+                  <Link href={href} style={{ textDecoration: "none", display: "block" }}>
                     <div
                       className="offre-card"
                       style={{

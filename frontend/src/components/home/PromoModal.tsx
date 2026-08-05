@@ -1,22 +1,63 @@
 import { useEffect, useState } from "react";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:6002/api/v1";
+const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "";
+
+interface PromoSettings {
+  enabled: boolean;
+  eyebrow: string;
+  title: string;
+  description: string;
+  image: string;
+  ctaText: string;
+  ctaLink: string;
+}
+
+const DEFAULT: PromoSettings = {
+  enabled: true,
+  eyebrow: "BIENVENUE !",
+  title: "Découvrez notre nouvelle collection d'intérieur",
+  description: "Des designs raffinés et des matériaux d'exception pour sublimer chaque espace de votre maison. Profitez de nos nouveautés exclusives dès aujourd'hui.",
+  image: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=800&auto=format&fit=crop",
+  ctaText: "Découvrez",
+  ctaLink: "/products",
+};
+
 export default function PromoModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const [settings, setSettings] = useState<PromoSettings>(DEFAULT);
 
   useEffect(() => {
-    // Show only once per session
     const hasShown = sessionStorage.getItem("kort_promo_shown");
-    if (!hasShown) {
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 1500); // 1.5s delay
-      return () => clearTimeout(timer);
-    }
+    if (hasShown) return;
+
+    // Fetch settings from API
+    fetch(`${API_BASE}/promo-modal`)
+      .then((r) => r.json())
+      .then((data: PromoSettings) => {
+        if (data && data.enabled !== false) {
+          setSettings(data);
+          const timer = setTimeout(() => setIsOpen(true), 1500);
+          return () => clearTimeout(timer);
+        }
+      })
+      .catch(() => {
+        // Fallback to default if API fails
+        const timer = setTimeout(() => setIsOpen(true), 1500);
+        return () => clearTimeout(timer);
+      });
   }, []);
 
   const handleClose = () => {
     sessionStorage.setItem("kort_promo_shown", "true");
     setIsOpen(false);
+  };
+
+  const resolveImage = (img: string) => {
+    if (!img) return "";
+    if (img.startsWith("http")) return img;
+    if (img.startsWith("/public")) return `${IMAGE_BASE}${img}`;
+    return img;
   };
 
   if (!isOpen) return null;
@@ -32,21 +73,19 @@ export default function PromoModal() {
         {/* Top Image Banner */}
         <div className="promo-banner">
           <img
-            src="https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=800&auto=format&fit=crop"
+            src={resolveImage(settings.image)}
             alt="Kort Interiors Collection"
           />
         </div>
 
         {/* Content */}
         <div className="promo-body">
-          <span className="promo-eyebrow">BIENVENUE !</span>
-          <h2 className="promo-title">Découvrez notre nouvelle collection d'intérieur</h2>
-          <p className="promo-desc">
-            Des designs raffinés et des matériaux d'exception pour sublimer chaque espace de votre maison. Profitez de nos nouveautés exclusives dès aujourd'hui.
-          </p>
+          <span className="promo-eyebrow">{settings.eyebrow}</span>
+          <h2 className="promo-title">{settings.title}</h2>
+          <p className="promo-desc">{settings.description}</p>
 
-          <a href="/products" className="promo-cta" onClick={handleClose}>
-            Découvrez
+          <a href={settings.ctaLink} className="promo-cta" onClick={handleClose}>
+            {settings.ctaText}
           </a>
         </div>
       </div>

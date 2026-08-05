@@ -74,7 +74,10 @@ export default function BlogSection() {
     };
   }, []);
 
-  const latestBlogs = useMemo(() => blogs.slice(0, 3), [blogs]);
+  const latestBlogs = useMemo(() =>
+    [...blogs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [blogs]
+  );
 
   return (
     <section style={{ background: "#fff" }}>
@@ -133,8 +136,10 @@ export default function BlogSection() {
                         src={
                           typeof a.image === "string" && a.image.startsWith("http")
                             ? a.image
+                            : typeof a.image === "string" && a.image.startsWith("/public")
+                            ? `${IMAGE_BASE}${a.image}`
                             : typeof a.image === "string" && a.image.startsWith("/")
-                            ? a.image
+                            ? a.image  // frontend static asset e.g. /blog/xxx.jpg
                             : `${IMAGE_BASE}${a.image}`
                         }
                         alt={a.title}

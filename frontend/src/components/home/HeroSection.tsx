@@ -154,18 +154,42 @@ export default function HeroSection() {
               background: slide.bg,
               paddingTop: "68px",
             }}>
-              {/* Background image */}
-              <img
-                src={getImageUrl(slide, i)}
-                alt=""
-                style={{
-                  position: "absolute", inset: 0,
-                  width: "100%", height: "100%",
-                  objectFit: "cover", opacity: 0.45,
-                  filter: "grayscale(10%)",
-                }}
-                onError={(e) => { e.currentTarget.style.opacity = "0"; }}
-              />
+              {/* Background image or video */}
+              {(() => {
+                const url = getImageUrl(slide, i);
+                const isVideo = url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".mov");
+                if (isVideo) {
+                  return (
+                    <video
+                      src={url}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      style={{
+                        position: "absolute", inset: 0,
+                        width: "100%", height: "100%",
+                        objectFit: "cover", opacity: 0.45,
+                        filter: "grayscale(10%)",
+                      }}
+                    />
+                  );
+                } else {
+                  return (
+                    <img
+                      src={url}
+                      alt=""
+                      style={{
+                        position: "absolute", inset: 0,
+                        width: "100%", height: "100%",
+                        objectFit: "cover", opacity: 0.45,
+                        filter: "grayscale(10%)",
+                      }}
+                      onError={(e) => { e.currentTarget.style.opacity = "0"; }}
+                    />
+                  );
+                }
+              })()}
 
               {/* Overlay gradient */}
               <div style={{

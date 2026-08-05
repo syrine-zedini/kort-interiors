@@ -18,6 +18,8 @@ import joolanRoutes from "./routes/joolan.route"
 import dbViewerRoutes from "./routes/db-viewer.route"
 import settingsRoutes from "./routes/settings.route"
 import ooposTicketStatusRoutes from "./routes/oopos-ticket-status.route"
+import promoModalRoutes from "./routes/promoModal.route"
+import videoSectionRoutes from "./routes/videoSection.route"
 import { loadSiteSettings } from "./config/siteSettings"
 import cors from 'cors';
 import path from 'path';
@@ -117,6 +119,8 @@ app.use(`/api/${version}/joolan`, joolanRoutes)
 app.use(`/api/${version}/db-viewer`, dbViewerRoutes)
 app.use(`/api/${version}/settings`, settingsRoutes)
 app.use(`/api/${version}/oopos-ticket-statuses`, ooposTicketStatusRoutes)
+app.use(`/api/${version}/promo-modal`, promoModalRoutes)
+app.use(`/api/${version}/video-section`, videoSectionRoutes)
 
 // Backward-compatible mounts (non-versioned)
 app.use("/products", productRoutes);

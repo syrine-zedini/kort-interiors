@@ -19,7 +19,17 @@ export default function BlogCard({ blog, onDelete, isDeleting }: BlogCardProps) 
     }
   };
 
-  const imageUrl = blog.image ? `${IMAGE_BASE}${blog.image}` : null;
+  const FRONTEND_BASE = process.env.NEXT_PUBLIC_FRONTEND_URL ?? "http://localhost:3005";
+
+  // Images from backend uploads start with /public/
+  // Images from frontend static assets start with /blog/ or similar
+  const imageUrl = blog.image
+    ? blog.image.startsWith("http")
+      ? blog.image
+      : blog.image.startsWith("/public")
+      ? `${IMAGE_BASE}${blog.image}`
+      : `${FRONTEND_BASE}${blog.image}`
+    : null;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">

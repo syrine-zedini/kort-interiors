@@ -407,6 +407,88 @@ export const runMigrations = async (sequelize: Sequelize) => {
     console.error('oopos_ticket_statuses migration error:', err.message);
   }
 
+  // Create promo_modal_settings table and seed default settings row
+  try {
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS "promo_modal_settings" (
+        "id"          UUID NOT NULL PRIMARY KEY,
+        "enabled"     BOOLEAN NOT NULL DEFAULT TRUE,
+        "eyebrow"     VARCHAR(255) NOT NULL,
+        "title"       VARCHAR(255) NOT NULL,
+        "description" TEXT NOT NULL,
+        "image"       VARCHAR(255) NOT NULL,
+        "ctaText"     VARCHAR(255) NOT NULL DEFAULT 'Découvrez',
+        "ctaLink"     VARCHAR(255) NOT NULL DEFAULT '/products',
+        "createdAt"   TIMESTAMP WITH TIME ZONE NOT NULL,
+        "updatedAt"   TIMESTAMP WITH TIME ZONE NOT NULL
+      );
+    `);
+    
+    // Insert single default row if none exists
+    const [rows] = await sequelize.query('SELECT count(*) as count FROM "promo_modal_settings"');
+    if (rows && (rows[0] as any).count === '0') {
+      const defaultId = '11111111-1111-1111-1111-111111111111';
+      const now = new Date().toISOString();
+      await sequelize.query(`
+        INSERT INTO "promo_modal_settings" ("id", "enabled", "eyebrow", "title", "description", "image", "ctaText", "ctaLink", "createdAt", "updatedAt")
+        VALUES (
+          '${defaultId}',
+          true,
+          'BIENVENUE !',
+          'Découvrez notre nouvelle collection d''intérieur',
+          'Des designs raffinés et des matériaux d''exception pour sublimer chaque espace de votre maison. Profitez de nos nouveautés exclusives dès aujourd''hui.',
+          'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=800&auto=format&fit=crop',
+          'Découvrez',
+          '/products',
+          '${now}',
+          '${now}'
+        )
+      `);
+      console.log('🌱 Seeded default promo_modal_settings row');
+    }
+    console.log('✅ promo_modal_settings table ready');
+  } catch (err: any) {
+    console.error('promo_modal_settings migration error:', err.message);
+  }
+
+  // Create video_section_settings table and seed default settings row
+  try {
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS "video_section_settings" (
+        "id"          UUID NOT NULL PRIMARY KEY,
+        "eyebrow"     VARCHAR(255) NOT NULL,
+        "title"       VARCHAR(255) NOT NULL,
+        "poster"      VARCHAR(255) NOT NULL,
+        "video"       VARCHAR(255) NOT NULL,
+        "createdAt"   TIMESTAMP WITH TIME ZONE NOT NULL,
+        "updatedAt"   TIMESTAMP WITH TIME ZONE NOT NULL
+      );
+    `);
+    
+    // Insert single default row if none exists
+    const [rows] = await sequelize.query('SELECT count(*) as count FROM "video_section_settings"');
+    if (rows && (rows[0] as any).count === '0') {
+      const defaultId = '22222222-2222-2222-2222-222222222222';
+      const now = new Date().toISOString();
+      await sequelize.query(`
+        INSERT INTO "video_section_settings" ("id", "eyebrow", "title", "poster", "video", "createdAt", "updatedAt")
+        VALUES (
+          '${defaultId}',
+          'L''univers Kort',
+          'Créer votre havre de paix',
+          '/videos/poster.png',
+          '/videos/reel_3.mp4',
+          '${now}',
+          '${now}'
+        )
+      `);
+      console.log('🌱 Seeded default video_section_settings row');
+    }
+    console.log('✅ video_section_settings table ready');
+  } catch (err: any) {
+    console.error('video_section_settings migration error:', err.message);
+  }
+
   // Fix types if they were created as varchar
   try {
     await sequelize.query(`ALTER TABLE "products" ALTER COLUMN "styles" TYPE UUID[] USING "styles"::uuid[]`);

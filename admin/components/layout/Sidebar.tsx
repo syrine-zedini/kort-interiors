@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, Tag, Image, Palette, FileText, Percent, Users, ShoppingCart, PackageOpen, Layers, Wrench, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Package, Tag, Image, Palette, FileText, Percent, Users, ShoppingCart, PackageOpen, Layers, Wrench, ArrowLeft, Megaphone } from "lucide-react";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -13,6 +13,8 @@ const links = [
   { href: "/styles", label: "Styles", icon: Tag },
   { href: "/heroSlide", label: "Hero Slides", icon: Layers },
   { href: "/blog", label: "Blogs", icon: FileText },
+  { href: "/promo-modal", label: "Pop-up Accueil", icon: Megaphone },
+  { href: "/video-section", label: "Section Vidéo", icon: Layers },
   { href: "/promotions", label: "Promotions", icon: Percent },
   { href: "/client", label: "Clients", icon: Users },
   { href: "/commande", label: "Commandes", icon: ShoppingCart },

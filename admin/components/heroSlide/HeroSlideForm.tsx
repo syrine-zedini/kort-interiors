@@ -284,8 +284,10 @@ export default function HeroSlideForm({ initial, onSubmit, loading }: HeroSlideF
         <ImageUploader
           value={image}
           onChange={(val) => setImage(typeof val === "string" ? val : val[0] || "")}
-          label="Image du slide"
+          label="Image ou Vidéo du slide"
           multiple={false}
+          accept="image/*,video/mp4,video/webm,video/*"
+          hint="Une image ou une vidéo (MP4/WebM)"
         />
       </div>
 

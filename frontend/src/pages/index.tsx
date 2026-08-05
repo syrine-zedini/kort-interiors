@@ -16,11 +16,11 @@ export default function Home() {
       <LuxuryNavbar />
       <HeroSection />
       <CategoryTiles />
+      <SocialSection />
       <OffresSection />
       <EditorialSection />
       <VideoSection />
       <BlogSection />
-      <SocialSection />
       <NewsletterSection />
       <SiteFooter />
       <PromoModal />

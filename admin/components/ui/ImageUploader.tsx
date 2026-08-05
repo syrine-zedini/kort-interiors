@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, Film } from "lucide-react";
 import { uploadImages } from "@/lib/api";
 
 interface ImageUploaderProps {
@@ -9,13 +9,30 @@ interface ImageUploaderProps {
   onChange: (paths: string[] | string) => void;
   label?: string;
   multiple?: boolean;
+  accept?: string; // e.g. "video/mp4,video/*" for video uploads
+  hint?: string;   // e.g. "Un fichier MP4"
 }
 
-export default function ImageUploader({ value, onChange, label, multiple = true }: ImageUploaderProps) {
+export default function ImageUploader({
+  value,
+  onChange,
+  label,
+  multiple = true,
+  accept = "image/*",
+  hint,
+}: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? "";
-  
+  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL ?? "http://localhost:3005";
+
+  const resolveSrc = (path: string) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    if (path.startsWith("/videos/")) return `${FRONTEND_URL}${path}`;
+    return `${IMAGE_BASE}${path}`;
+  };
+
   // Normalize value to always be an array for internal handling
   const imageArray = Array.isArray(value) ? value : (value ? [value] : []);
 
@@ -38,6 +55,11 @@ export default function ImageUploader({ value, onChange, label, multiple = true 
     onChange(multiple ? updated : (updated[0] || ""));
   };
 
+  const isVideo = (path: string) =>
+    path.endsWith(".mp4") || path.endsWith(".webm") || path.endsWith(".mov");
+
+  const defaultHint = multiple ? "Plusieurs fichiers acceptés" : accept.includes("video") ? "Un fichier vidéo" : "Une image";
+
   return (
     <div className="flex flex-col gap-2">
       {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
@@ -56,15 +78,15 @@ export default function ImageUploader({ value, onChange, label, multiple = true 
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 text-gray-400">
-            <Upload size={24} />
+            {accept.includes("video") ? <Film size={24} /> : <Upload size={24} />}
             <span className="text-sm">Glisser-déposer ou cliquer pour choisir</span>
-            <span className="text-xs">{multiple ? "Plusieurs images acceptées" : "Une image"}</span>
+            <span className="text-xs">{hint ?? defaultHint}</span>
           </div>
         )}
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={accept}
           multiple={multiple}
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
@@ -75,10 +97,19 @@ export default function ImageUploader({ value, onChange, label, multiple = true 
       {imageArray.length > 0 && (
         <div className="grid grid-cols-4 gap-2 mt-1">
           {imageArray.map((path) => {
-            const src = typeof path === "string" && path.startsWith("http") ? path : `${IMAGE_BASE}${path}`;
+            const src = resolveSrc(path);
             return (
               <div key={path} className="relative group rounded-lg overflow-hidden aspect-square bg-gray-100">
-                <img src={src} alt="" className="w-full h-full object-cover" />
+                {isVideo(path) ? (
+                  <video
+                    src={src}
+                    className="w-full h-full object-cover"
+                    muted
+                    preload="metadata"
+                  />
+                ) : (
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                )}
                 <button
                   type="button"
                   onClick={() => remove(path)}
