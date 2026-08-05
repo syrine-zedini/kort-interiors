@@ -118,8 +118,13 @@ export default function RelatedProductsPicker({
     });
   };
 
-  const firstImage = (p: ProductOption) =>
-    p.images && p.images.length > 0 ? p.images[0] : null;
+  const firstImage = (p: ProductOption) => {
+    if (!p.images || p.images.length === 0) return null;
+    const img = p.images[0];
+    if (img.startsWith("http")) return img;
+    const baseUrl = process.env.NEXT_PUBLIC_IMAGE_URL ?? "http://localhost:6002";
+    return `${baseUrl}${img.startsWith("/") ? "" : "/"}${img}`;
+  };
 
   return (
     <div className="space-y-4">
