@@ -53,10 +53,8 @@ export default function SocialSection() {
 
   const resolveMediaUrl = (url: string) => {
     if (!url) return "";
-    if (url.startsWith("http://localhost:6002")) {
-      return url.replace("http://localhost:6002", IMAGE_BASE);
-    }
-    return url;
+    // Replace any http:// backend URL (localhost or raw IP) with the configured prod URL
+    return url.replace(/^http:\/\/(localhost:\d+|\d+\.\d+\.\d+\.\d+:\d+)/, IMAGE_BASE);
   };
 
   const items = posts.length > 0
