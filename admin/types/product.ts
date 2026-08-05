@@ -56,7 +56,9 @@ export interface Product {
   variants?: ProductVariant[];
   items?: ProductItem[];
   visible?: boolean;
+  relatedProductIds?: string[];
 }
+
 
 export interface Category {
   id: string;
@@ -131,4 +133,6 @@ export interface CreateProductPayload {
     colors?: string[];
     images?: string[];
   }[];
+  relatedProductIds?: string[];
 }
+

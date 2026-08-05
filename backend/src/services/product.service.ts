@@ -648,6 +648,34 @@ async function ensureUniqueSlug(base: string, excludeId?: string): Promise<strin
 }
 
 
+/** Resolves an array of product IDs/codes into minimal enriched product objects. */
+const resolveRelatedProducts = async (ids?: string[]): Promise<any[]> => {
+    if (!ids || ids.length === 0) return [];
+    const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_URL ?? '';
+    const results: any[] = [];
+    for (const rawId of ids) {
+        try {
+            if (rawId.startsWith('oopos-')) {
+                const code = rawId.replace('oopos-', '').replace(/~/g, '/');
+                const p = await getProductByCode(code);
+                results.push(p);
+            } else if (isUUID(rawId)) {
+                const p = await Product.findByPk(rawId, { include: [variantInclude] });
+                if (p) {
+                    const plain: any = typeof p.toJSON === 'function' ? p.toJSON() : p;
+                    plain.images = (plain.images ?? []).map((img: string) =>
+                        img.startsWith('http') ? img : `${IMAGE_BASE}${img}`
+                    );
+                    results.push(await enrichProductWithPromotion(plain));
+                }
+            }
+        } catch {
+            // skip invalid / deleted products silently
+        }
+    }
+    return results;
+};
+
 export const getProductById = async (id: string) => {
     if (id.startsWith('oopos-')) {
         const code = id.replace('oopos-', '').replace(/~/g, '/');
@@ -657,13 +685,20 @@ export const getProductById = async (id: string) => {
     // UUID lookup
     if (isUUID(id)) {
         const product = await Product.findByPk(id, { include: [variantInclude, itemInclude] });
-        if (product) return await enrichProductWithPromotion(product);
+        if (product) {
+            const enriched = await enrichProductWithPromotion(product);
+            enriched.relatedProducts = await resolveRelatedProducts(enriched.relatedProductIds);
+            return enriched;
+        }
     }
 
     // Slug lookup (local products)
     const bySlug = await Product.findOne({ where: { slug: id }, include: [variantInclude, itemInclude] });
-    if (bySlug) return await enrichProductWithPromotion(bySlug);
-
+    if (bySlug) {
+        const enriched = await enrichProductWithPromotion(bySlug);
+        enriched.relatedProducts = await resolveRelatedProducts(enriched.relatedProductIds);
+        return enriched;
+    }
     // Fallback: try as OOPOS code
     try {
         return await getProductByCode(id);
@@ -789,6 +824,10 @@ export const updateProduct = async (id: string, data: any) => {
         product.changed('sizeMaterialPricing', true);
     }
     if (data.productType !== undefined) product.productType = data.productType;
+    if (data.relatedProductIds !== undefined) {
+        product.relatedProductIds = Array.isArray(data.relatedProductIds) ? data.relatedProductIds : null as any;
+        product.changed('relatedProductIds', true);
+    }
 
     await product.save();
     console.log(`[updateProduct] after save: sizePricing=${JSON.stringify(product.sizePricing)}`);

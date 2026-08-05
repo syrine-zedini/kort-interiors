@@ -15,6 +15,7 @@ import ImageUploader from "@/components/ui/ImageUploader";
 import Button from "@/components/ui/Button";
 import ProductItemsEditor, { ItemDraft } from "./ProductItemsEditor";
 import ProductVariantsEditor from "./ProductVariantsEditor";
+import RelatedProductsPicker from "./RelatedProductsPicker";
 
 const MATERIAL_ONLY_SIZE_KEY = "__material_only__";
 type PricingMode = "direct" | "size" | "material" | "size_material";
@@ -149,6 +150,7 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
     }) ?? []
   );
   const [manualVariants, setManualVariants] = useState(initial?.manualVariants ?? false);
+  const [relatedProductIds, setRelatedProductIds] = useState<string[]>(initial?.relatedProductIds ?? []);
   const [variants, setVariants] = useState<VariantDraft[]>(
     initial?.variants?.map((v) => ({
       id: v.id,
@@ -392,6 +394,7 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
             : (!manualVariants ? null : undefined),
       images,
       items: cleanedItems.length > 0 ? cleanedItems : undefined,
+      relatedProductIds: relatedProductIds.length > 0 ? relatedProductIds : [],
     });
   };
 
@@ -718,6 +721,23 @@ export default function ProductForm({ initial, onSubmit, loading }: ProductFormP
           productSizes={sizes}
         />
       </section>
+
+      {/* ── Produits associés (VOUS POUVEZ AUSSI ACHETER) ── */}
+      {initial?.id && (
+        <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-800">Produits associés</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Ces produits apparaîtront dans la section &laquo;&nbsp;VOUS POUVEZ AUSSI ACHETER&nbsp;&raquo; sur la page de ce produit.
+            </p>
+          </div>
+          <RelatedProductsPicker
+            value={relatedProductIds}
+            onChange={setRelatedProductIds}
+            excludeId={initial?.id}
+          />
+        </section>
+      )}
 
       {/* ── Submit ── */}
       <div className="flex justify-end">

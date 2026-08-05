@@ -342,6 +342,16 @@ const REQUIRED_COLUMNS: ColumnSpec[] = [
       defaultValue: null,
     },
   },
+  // ─── Related products ("VOUS POUVEZ AUSSI ACHETER") ─────────────────────────
+  {
+    table: "products",
+    column: "relatedProductIds",
+    definition: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
+    },
+  },
 ];
 
 const ensureColumn = async (qi: QueryInterface, spec: ColumnSpec) => {

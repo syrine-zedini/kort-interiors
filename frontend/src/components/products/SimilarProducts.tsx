@@ -5,17 +5,31 @@ import { ProductWithVariants } from "../../types/product";
 import { ProductCard } from "./card";
 
 interface SimilarProductsProps {
+    relatedProducts?: ProductWithVariants[];  // explicitly defined related products
     categoryId?: string;
     currentProductId: string;
     categorySlug?: string;
 }
 
-export const SimilarProducts: React.FC<SimilarProductsProps> = ({ categoryId, currentProductId, categorySlug }) => {
+export const SimilarProducts: React.FC<SimilarProductsProps> = ({
+    relatedProducts,
+    categoryId,
+    currentProductId,
+    categorySlug,
+}) => {
     const router = useRouter();
     const [products, setProducts] = useState<ProductWithVariants[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // If admin has manually set related products, use them directly
+        if (relatedProducts && relatedProducts.length > 0) {
+            setProducts(relatedProducts.filter((p) => p.id !== currentProductId));
+            setLoading(false);
+            return;
+        }
+
+        // Fallback: fetch by category (old behaviour)
         if (!categorySlug) {
             setLoading(false);
             return;
@@ -28,7 +42,7 @@ export const SimilarProducts: React.FC<SimilarProductsProps> = ({ categoryId, cu
                 const res = await api.get<ProductWithVariants[]>(`/products/category/${categorySlug}`);
                 if (!cancelled) {
                     const allProducts = res.data || [];
-                    const similar = allProducts.filter(p => p.id !== currentProductId).slice(0, 4);
+                    const similar = allProducts.filter((p) => p.id !== currentProductId).slice(0, 4);
                     setProducts(similar);
                 }
             } catch (err) {
@@ -42,7 +56,7 @@ export const SimilarProducts: React.FC<SimilarProductsProps> = ({ categoryId, cu
         return () => {
             cancelled = true;
         };
-    }, [categorySlug, currentProductId]);
+    }, [relatedProducts, categorySlug, currentProductId]);
 
     if (loading || products.length === 0) return null;
 
@@ -64,7 +78,7 @@ export const SimilarProducts: React.FC<SimilarProductsProps> = ({ categoryId, cu
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: "24px" }}>
-                {products.map(product => (
+                {products.map((product) => (
                     <div key={product.id} style={{ display: "flex", flexDirection: "column" }}>
                         <ProductCard
                             product={product}

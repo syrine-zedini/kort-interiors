@@ -469,10 +469,12 @@ export default function ItemDetailPage() {
 
             {/* Similar Products */}
             <SimilarProducts 
+                relatedProducts={(product as any).relatedProducts}
                 categoryId={product.categoryId} 
                 currentProductId={product.id} 
                 categorySlug={Array.isArray(categorySlug) ? categorySlug[0] : categorySlug ?? ""} 
             />
+
 
             {/* Toast Notification */}
             {showToast && (

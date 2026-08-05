@@ -1493,10 +1493,12 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
 
             {/* Similar Products */}
             <SimilarProducts 
+                relatedProducts={(product as any).relatedProducts}
                 categoryId={product.categoryId} 
                 currentProductId={product.id ?? ""} 
                 categorySlug={categorySlug} 
             />
+
 
             {/* Toast Notification */}
             {showToast && (
