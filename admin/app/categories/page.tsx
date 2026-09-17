@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Globe, Database, Pencil, Trash2, X, Check, RefreshCw, ChevronRight, Eye, EyeOff, Image as ImageIcon } from "lucide-react";
+import { Plus, Globe, Database, Pencil, Trash2, X, Check, RefreshCw, ChevronRight, Eye, EyeOff, Image as ImageIcon, Search } from "lucide-react";
 import { toast } from "sonner";
 import { fetchCategories, CategoryNode } from "@/lib/api";
 import api from "@/lib/axios";
@@ -407,6 +407,7 @@ export default function CategoriesPage() {
   const qc = useQueryClient();
 
   const [source, setSource] = useState<"oopos" | "local">("oopos");
+  const [searchQuery, setSearchQuery] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
@@ -421,6 +422,30 @@ export default function CategoriesPage() {
     queryFn: fetchCategories,
     enabled: source === "oopos",
   });
+
+  // Filter OOPOS tree based on search query
+  const filteredOoposCategories = useMemo(() => {
+    const raw = ooposCategories.filter(c => (c.productCount ?? 0) > 0 || (c.children?.length ?? 0) > 0);
+    if (!searchQuery.trim()) return raw;
+    const q = searchQuery.toLowerCase().trim();
+
+    const filterNode = (node: CategoryNode): CategoryNode | null => {
+      const matchSelf = node.name.toLowerCase().includes(q);
+      const filteredChildren = (node.children ?? [])
+        .map(filterNode)
+        .filter(Boolean) as CategoryNode[];
+
+      if (matchSelf || filteredChildren.length > 0) {
+        return {
+          ...node,
+          children: matchSelf ? node.children : filteredChildren,
+        };
+      }
+      return null;
+    };
+
+    return raw.map(filterNode).filter(Boolean) as CategoryNode[];
+  }, [ooposCategories, searchQuery]);
 
   // ── BD locale ─────────────────────────────────────────────────────────────
   const { data: catsRaw = [], isLoading: catsLoading, refetch: refetchCats } = useQuery<RawCat[]>({
@@ -444,9 +469,33 @@ export default function CategoriesPage() {
   });
 
   const localTree = useMemo(() => buildTree(catsRaw, hierRaw), [catsRaw, hierRaw]);
-  const visibleTree = useMemo(() => localTree.filter((n) => !isOrphan(n)), [localTree]);
+  const rawVisibleTree = useMemo(() => localTree.filter((n) => !isOrphan(n)), [localTree]);
+
+  // Filter tree based on search query
+  const visibleTree = useMemo(() => {
+    if (!searchQuery.trim()) return rawVisibleTree;
+    const q = searchQuery.toLowerCase().trim();
+
+    const filterNode = (node: TreeNode): TreeNode | null => {
+      const matchSelf = node.name.toLowerCase().includes(q);
+      const filteredChildren = node.children
+        .map(filterNode)
+        .filter(Boolean) as TreeNode[];
+
+      if (matchSelf || filteredChildren.length > 0) {
+        return {
+          ...node,
+          children: matchSelf ? node.children : filteredChildren,
+        };
+      }
+      return null;
+    };
+
+    return rawVisibleTree.map(filterNode).filter(Boolean) as TreeNode[];
+  }, [rawVisibleTree, searchQuery]);
+
   const localLoading = catsLoading || hierLoading;
-  const localTotal = useMemo(() => countNodes(visibleTree), [visibleTree]);
+  const localTotal = useMemo(() => countNodes(rawVisibleTree), [rawVisibleTree]);
 
   const invalidateLocal = () => {
     qc.invalidateQueries({ queryKey: ["local-cats-raw"] });
@@ -530,6 +579,26 @@ export default function CategoriesPage() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
 
+          {/* Search Bar */}
+          <div className="relative flex items-center">
+            <Search size={16} className="absolute left-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher une catégorie..."
+              className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition-all w-60"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
           {/* Source toggle (admin view) */}
           <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-1">
             <button onClick={() => { setSource("oopos"); setEditId(null); }}
@@ -582,9 +651,9 @@ export default function CategoriesPage() {
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           {ooposLoading
             ? <div className="p-10 text-center text-gray-400 text-sm">Chargement…</div>
-            : ooposCategories.length === 0
-            ? <div className="p-10 text-center text-gray-400 text-sm">Aucune catégorie OOPOS.</div>
-            : <OoposTree nodes={ooposCategories.filter(c => (c.productCount ?? 0) > 0 || (c.children?.length ?? 0) > 0)} />}
+            : filteredOoposCategories.length === 0
+            ? <div className="p-10 text-center text-gray-400 text-sm">Aucune catégorie trouvée.</div>
+            : <OoposTree nodes={filteredOoposCategories} />}
         </div>
       )}
 
