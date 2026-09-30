@@ -5,10 +5,53 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   ReactNode,
   useCallback,
 } from "react";
 import { CartItem, CartTotals } from "@/types/cart";
+import { useAuth } from "@/contexts/AuthContext";
+
+// Snapshot passed by the caller (product page) so a guest item can be
+// displayed immediately without an extra round-trip to the server.
+export interface GuestCartSnapshot {
+  unitPrice: number;
+  productName?: string;
+  productImages?: string[];
+  pieceName?: string;
+  pieceImage?: string;
+  colorName?: string;
+  displaySize?: string;
+}
+
+export const GUEST_CART_KEY = "kort_guest_cart";
+
+const readGuestCart = (): CartItem[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(GUEST_CART_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeGuestCart = (items: CartItem[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+  } catch {
+    // Storage unavailable (private mode, quota) — guest cart just won't persist.
+  }
+};
+
+const computeGuestTotals = (items: CartItem[]): CartTotals => {
+  const subtotal = items.reduce((sum, i) => sum + Number(i.priceAtPurchase) * i.quantity, 0);
+  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+  const shipping = subtotal > 0 && subtotal < 100 ? 10 : 0;
+  const grandTotal = Math.round((subtotal + shipping) * 100) / 100;
+  return { subtotal, shipping, grandTotal, itemCount, items };
+};
 
 interface CartContextType {
   items: CartItem[];
@@ -21,7 +64,8 @@ interface CartContextType {
     selectedSize?: string,
     selectedColor?: string,
     selectedItemId?: string,
-    selectedMaterial?: string
+    selectedMaterial?: string,
+    guestSnapshot?: GuestCartSnapshot
   ) => Promise<void>;
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>;
   removeFromCart: (cartItemId: string) => Promise<void>;
@@ -34,6 +78,8 @@ interface CartContextType {
 export const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  const wasAuthenticatedRef = useRef(isAuthenticated);
   const [items, setItems] = useState<CartItem[]>([]);
   const [totals, setTotals] = useState<CartTotals | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +103,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const fetchCart = useCallback(async () => {
     try {
       if (!hasToken()) {
-        setItems([]);
+        setItems(readGuestCart());
         setError(null);
         return;
       }
@@ -96,7 +142,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const fetchTotals = useCallback(async () => {
     try {
       if (!hasToken()) {
-        setTotals(null);
+        setTotals(computeGuestTotals(readGuestCart()));
         return;
       }
       const api = await getApi();
@@ -124,12 +170,61 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       selectedSize?: string,
       selectedColor?: string,
       selectedItemId?: string,
-      selectedMaterial?: string
+      selectedMaterial?: string,
+      guestSnapshot?: GuestCartSnapshot
     ) => {
       try {
         setError(null);
+
+        // Guest (not logged in yet): keep the item locally so nothing is lost
+        // before the user eventually logs in at checkout time.
+        if (!hasToken()) {
+          const guestItems = readGuestCart();
+          const matchIndex = guestItems.findIndex(
+            (i) =>
+              i.productId === productId &&
+              (i.selectedSize ?? "") === (selectedSize ?? "") &&
+              (i.selectedColor ?? "") === (selectedColor ?? "") &&
+              (i.selectedMaterial ?? "") === (selectedMaterial ?? "") &&
+              ((i as any).selectedItemId ?? "") === (selectedItemId ?? "")
+          );
+
+          if (matchIndex >= 0) {
+            guestItems[matchIndex] = {
+              ...guestItems[matchIndex],
+              quantity: guestItems[matchIndex].quantity + quantity,
+            };
+          } else {
+            guestItems.push({
+              id: `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              userId: "guest",
+              productId,
+              quantity,
+              priceAtPurchase: guestSnapshot?.unitPrice ?? 0,
+              selectedSize,
+              selectedColor,
+              selectedMaterial,
+              selectedItemId,
+              displaySize: guestSnapshot?.displaySize ?? selectedSize,
+              pieceName: guestSnapshot?.pieceName,
+              pieceImage: guestSnapshot?.pieceImage,
+              colorName: guestSnapshot?.colorName,
+              product: {
+                id: productId,
+                name: guestSnapshot?.productName,
+                images: guestSnapshot?.productImages,
+              } as any,
+            } as CartItem);
+          }
+
+          writeGuestCart(guestItems);
+          setItems(guestItems);
+          setTotals(computeGuestTotals(guestItems));
+          return;
+        }
+
         const api = await getApi();
-        const response = await api.post("/cart", {
+        await api.post("/cart", {
           productId,
           quantity,
           selectedSize,
@@ -157,6 +252,15 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     async (cartItemId: string, quantity: number) => {
       try {
         setError(null);
+        if (!hasToken()) {
+          const guestItems = readGuestCart()
+            .map((i) => (i.id === cartItemId ? { ...i, quantity } : i))
+            .filter((i) => i.quantity > 0);
+          writeGuestCart(guestItems);
+          setItems(guestItems);
+          setTotals(computeGuestTotals(guestItems));
+          return;
+        }
         const api = await getApi();
         await api.patch(`/cart/${cartItemId}`, { quantity });
         await fetchCart();
@@ -175,6 +279,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     async (cartItemId: string) => {
       try {
         setError(null);
+        if (!hasToken()) {
+          const guestItems = readGuestCart().filter((i) => i.id !== cartItemId);
+          writeGuestCart(guestItems);
+          setItems(guestItems);
+          setTotals(computeGuestTotals(guestItems));
+          return;
+        }
         const api = await getApi();
         await api.delete(`/cart/${cartItemId}`);
         await fetchCart();
@@ -192,6 +303,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const clearCart = useCallback(async () => {
     try {
       setError(null);
+      if (!hasToken()) {
+        writeGuestCart([]);
+        setItems([]);
+        setTotals(null);
+        return;
+      }
       const api = await getApi();
       await api.delete("/cart");
       setItems([]);
@@ -235,6 +352,42 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     initializeCart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Merge the guest (localStorage) cart into the server cart right after login,
+  // so items added before authenticating are never lost.
+  const mergeGuestCart = useCallback(async () => {
+    const guestItems = readGuestCart();
+    if (guestItems.length === 0) return;
+    try {
+      const api = await getApi();
+      for (const item of guestItems) {
+        try {
+          await api.post("/cart", {
+            productId: item.productId,
+            quantity: item.quantity,
+            selectedSize: item.selectedSize,
+            selectedColor: item.selectedColor,
+            selectedItemId: (item as any).selectedItemId,
+            selectedMaterial: item.selectedMaterial,
+          });
+        } catch (err) {
+          if (!isProduction) console.error("❌ Failed to merge guest cart item:", err);
+        }
+      }
+    } finally {
+      writeGuestCart([]);
+    }
+  }, [getApi, isProduction]);
+
+  useEffect(() => {
+    if (!wasAuthenticatedRef.current && isAuthenticated) {
+      mergeGuestCart().then(() => {
+        fetchCart();
+        fetchTotals();
+      });
+    }
+    wasAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated, mergeGuestCart, fetchCart, fetchTotals]);
 
   const value: CartContextType = {
     items,

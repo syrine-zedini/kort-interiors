@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useCart as useCartContext } from "@/contexts/CartContext";
+import { useCart as useCartContext, GuestCartSnapshot } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { CartItem } from "@/types/cart";
 
@@ -74,12 +74,13 @@ export const useAddToCart = () => {
     selectedSize?: string,
     selectedColor?: string,
     selectedItemId?: string,
-    selectedMaterial?: string
+    selectedMaterial?: string,
+    guestSnapshot?: GuestCartSnapshot
   ) => {
     try {
       setIsAdding(true);
       setAddError(null);
-      await addToCart(productId, quantity, selectedSize, selectedColor, selectedItemId, selectedMaterial);
+      await addToCart(productId, quantity, selectedSize, selectedColor, selectedItemId, selectedMaterial, guestSnapshot);
       return true;
     } catch (error: any) {
       const message = error?.response?.data?.message || "Impossible d'ajouter l'article au panier";

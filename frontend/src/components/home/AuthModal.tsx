@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import api from "@/libs/axios";
 import { useAuth } from "@/contexts/AuthContext";
+import { GUEST_CART_KEY } from "@/contexts/CartContext";
 
 interface AuthModalProps {
   open: boolean;
@@ -15,8 +17,23 @@ interface SuccessMessage {
   duration?: number;
 }
 
+// Was there anything in the guest (localStorage) cart right before this login?
+// If so, we redirect to /cart after connecting so the user sees it, since it's
+// exactly what they were trying to do before being asked to log in.
+const hasGuestCartItems = (): boolean => {
+  try {
+    const raw = localStorage.getItem(GUEST_CART_KEY);
+    if (!raw) return false;
+    const items = JSON.parse(raw);
+    return Array.isArray(items) && items.length > 0;
+  } catch {
+    return false;
+  }
+};
+
 export default function AuthModal({ open, onClose }: AuthModalProps) {
   const { login } = useAuth();
+  const router = useRouter();
   const [tab, setTab] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -110,20 +127,56 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           password,
         });
 
-        setSuccess({
-          title: "Compte créé avec succès !",
-          message: "Veuillez vérifier votre e-mail pour valider votre compte.",
-          duration: 3000,
-        });
+        // Try to log the user in right away with the credentials they just
+        // entered, so they don't have to type them a second time. If the
+        // backend requires email/phone validation first, this silently fails
+        // and we fall back to the previous "check your email" flow below.
+        let autoLoggedIn = false;
+        const hadGuestCartItems = hasGuestCartItems();
+        try {
+          const loginResponse = await api.post("/auth/login", {
+            email: email.toLowerCase(),
+            password,
+          });
+          if (loginResponse.data.token && loginResponse.data.user) {
+            login(loginResponse.data.token, loginResponse.data.user);
+            autoLoggedIn = true;
+          }
+        } catch {
+          autoLoggedIn = false;
+        }
 
-        setTimeout(() => {
-          setName("");
-          setEmail("");
-          setPassword("");
-          setTab("login");
-          setSuccess(null);
-          onClose();
-        }, 3000);
+        if (autoLoggedIn) {
+          setSuccess({
+            title: "Compte créé avec succès !",
+            message: `Bienvenue ${name.trim()} !`,
+            duration: 2000,
+          });
+
+          setTimeout(() => {
+            setName("");
+            setEmail("");
+            setPassword("");
+            setSuccess(null);
+            onClose();
+            if (hadGuestCartItems) router.push("/cart");
+          }, 2000);
+        } else {
+          setSuccess({
+            title: "Compte créé avec succès !",
+            message: "Veuillez vérifier votre e-mail pour valider votre compte.",
+            duration: 3000,
+          });
+
+          setTimeout(() => {
+            setName("");
+            setEmail("");
+            setPassword("");
+            setTab("login");
+            setSuccess(null);
+            onClose();
+          }, 3000);
+        }
       } else {
         if (!validateEmail(email)) {
           setEmailError("Veuillez entrer une adresse e-mail valide");
@@ -134,6 +187,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           return;
         }
 
+        const hadGuestCartItems = hasGuestCartItems();
         setIsLoading(true);
         const response = await api.post("/auth/login", {
           email: email.toLowerCase(),
@@ -158,6 +212,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
           setPassword("");
           setSuccess(null);
           onClose();
+          if (hadGuestCartItems) router.push("/cart");
         }, 2000);
       }
     } catch (err: any) {

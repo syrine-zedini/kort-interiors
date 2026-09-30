@@ -1150,7 +1150,16 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                                                                 pieceSize || undefined,
                                                                 undefined,
                                                                 item.id,
-                                                                itemSelectedSizes[`${item.id}__material`] || undefined
+                                                                itemSelectedSizes[`${item.id}__material`] || undefined,
+                                                                {
+                                                                    unitPrice: itemFinalPrice ?? 0,
+                                                                    productName: product.name,
+                                                                    productImages: displayImages,
+                                                                    pieceName: item.name,
+                                                                    pieceImage: item.images?.[0],
+                                                                    colorName: pieceColorName,
+                                                                    displaySize: pieceSize || undefined,
+                                                                }
                                                             );
                                                             setToastMessage('✓ Produit ajouté au panier!');
                                                             setShowToast(true);
@@ -1355,7 +1364,14 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, categor
                                             selectedVariant?.size || effectiveSelectedSize,
                                             selectedColorId || selectedVariant?.color,
                                             undefined,
-                                            selectedMaterial
+                                            selectedMaterial,
+                                            {
+                                                unitPrice: finalPrice,
+                                                productName: product.name,
+                                                productImages: displayImages,
+                                                colorName: selectedColorName,
+                                                displaySize: selectedVariant?.size || effectiveSelectedSize,
+                                            }
                                         );
                                         setToastMessage('✓ Produit ajouté au panier!');
                                         setShowToast(true);

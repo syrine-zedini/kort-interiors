@@ -232,6 +232,94 @@ export default function CommandesPage() {
     }
   };
 
+  const handlePrintInvoice = (commande: CommandeType) => {
+    const addressText = commande.shippingAddress
+      ? typeof commande.shippingAddress === "string"
+        ? commande.shippingAddress
+        : JSON.stringify(commande.shippingAddress).replace(/[{"}]/g, "")
+      : "—";
+
+    const itemsHtml = (commande.items ?? [])
+      .map((item) => {
+        const name = item.product?.name || "Produit";
+        const details = [item.selectedSize?.replace("__item__:", ""), item.selectedColor]
+          .filter(Boolean)
+          .join(" - ");
+        const unitPrice = Number(item.priceAtPurchase);
+        const lineTotal = (item.quantity * unitPrice).toFixed(2);
+        return `
+          <tr>
+            <td>${name}${details ? `<br/><span class="muted small">${details}</span>` : ""}</td>
+            <td style="text-align:center;">${item.quantity}</td>
+            <td style="text-align:right;">${unitPrice.toFixed(2)} DT</td>
+            <td style="text-align:right;">${lineTotal} DT</td>
+          </tr>`;
+      })
+      .join("");
+
+    const invoiceNumber = commande.trackingNumber || commande.id.split("-")[0].toUpperCase();
+
+    const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Facture ${invoiceNumber}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; padding: 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .muted { color: #777; }
+  .small { font-size: 11px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  th, td { padding: 10px 8px; border-bottom: 1px solid #eee; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; color: #888; border-bottom: 2px solid #1a1a1a; }
+  .total-row td { border-bottom: none; font-weight: 700; font-size: 15px; padding-top: 16px; }
+  .header { display: flex; justify-content: space-between; margin-bottom: 24px; }
+  .box { background: #f8f8f8; padding: 14px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>KORT INTERIORS</h1>
+      <p class="muted">Facture / Détail de commande</p>
+    </div>
+    <div style="text-align:right;">
+      <p><strong>N° ${invoiceNumber}</strong></p>
+      <p class="muted">${new Date(commande.createdAt).toLocaleDateString("fr-FR")}</p>
+    </div>
+  </div>
+
+  <div class="box">
+    <strong>Client :</strong> ${commande.user?.username || "—"}<br/>
+    ${commande.user?.email || ""}<br/>
+    <strong>Adresse de livraison :</strong> ${addressText}<br/>
+    <strong>Paiement (virement bancaire) :</strong> ${commande.paymentMethod === "online" ? "En ligne" : "À la livraison"}<br/>
+    <strong>Statut :</strong> ${STATUS_LABELS[commande.status]}
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Produit</th><th style="text-align:center;">Qté</th><th style="text-align:right;">Prix unitaire</th><th style="text-align:right;">Total</th></tr>
+    </thead>
+    <tbody>
+      ${itemsHtml}
+      <tr class="total-row">
+        <td colspan="3" style="text-align:right;">TOTAL</td>
+        <td style="text-align:right;">${Number(commande.totalAmount).toFixed(2)} DT</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => printWindow.print();
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -243,7 +331,7 @@ export default function CommandesPage() {
            </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* <button
+          <button
             onClick={() => { setUseOopos(!useOopos); setCurrentPage(1); setSearch(""); }}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               useOopos
@@ -252,7 +340,7 @@ export default function CommandesPage() {
             }`}
           >
             {useOopos ? "Voir e-commerce locales" : "Voir tickets OOPOS"}
-          </button> */}
+          </button>
           <span className="text-sm text-gray-500">
             {filtered.length} {useOopos ? "Ticket(s)" : "Commande(s)"}
           </span>
@@ -552,9 +640,13 @@ export default function CommandesPage() {
                         Confirmer
                       </button>
                     )}
-                    {!["pending", "preconfirmed"].includes(commande.status) && (
-                      <span className="text-xs text-gray-400 italic">—</span>
-                    )}
+                    <button
+                      onClick={() => handlePrintInvoice(commande)}
+                      className="p-1.5 text-blue-400 hover:bg-blue-50 rounded"
+                      title="Facture / PDF"
+                    >
+                      <FileText size={16} />
+                    </button>
                   </div>
                 </div>
               );
